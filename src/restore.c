@@ -1121,7 +1121,7 @@ int restore_send_component(restored_client_t restore, struct idevicerestore_clie
 	return 0;
 }
 
-int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity)
+int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity, plist_t message)
 {
 
 	char* llb_path = NULL;
@@ -1140,9 +1140,14 @@ int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* 
 	unsigned char* nor_data = NULL;
 	plist_t norimage = NULL;
 	plist_t firmware_files = NULL;
-	uint32_t i;
+	int flash_version_1 = 0;
 
 	info("About to send NORData...\n");
+
+	plist_t arguments = plist_dict_get_item(message, "Arguments");
+	if (arguments && plist_get_node_type(arguments) == PLIST_DICT) {
+		flash_version_1 = plist_dict_get_item(arguments, "FlashVersion1") ? 1 : 0;
+	}
 
 	if (client->tss) {
 		if (tss_response_get_path_by_entry(client->tss, "LLB", &llb_path) < 0) {
@@ -1263,9 +1268,7 @@ int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* 
 	plist_dict_set_item(dict, "LlbImageData", plist_new_data((char*)llb_data, (uint64_t) llb_size));
 	free(llb_data);
 
-	if (client->build_major >= 20) {
-		// Starting with M1 macs, it seems that NorImageData is now a dict.
-		// Sending an array like previous versions results in restore success but the machine will SOS after rebooting.
+	if (flash_version_1) {
 		norimage = plist_new_dict();
 	} else {
 		norimage = plist_new_array();
@@ -1321,7 +1324,7 @@ int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* 
 		component_data = NULL;
 		component_size = 0;
 
-		if (client->build_major >= 20) {
+		if (flash_version_1) {
 			plist_dict_set_item(norimage, component, plist_new_data((char*)nor_data, (uint64_t)nor_size));
 		} else {
 			/* make sure iBoot is the first entry in the array */
@@ -1839,7 +1842,7 @@ static int restore_send_baseband_data(restored_client_t restore, struct idevicer
 		plist_dict_set_item(parameters, "BbGoldCertId", plist_new_uint(bb_cert_id));
 		plist_dict_set_item(parameters, "BbSNUM", plist_new_data((const char*)bb_snum, bb_snum_size));
 
-		tss_parameters_add_from_manifest(parameters, build_identity);
+		tss_parameters_add_from_manifest(parameters, build_identity, true);
 
 		/* create baseband request */
 		plist_t request = tss_request_new(NULL);
@@ -2183,7 +2186,7 @@ static plist_t restore_get_se_firmware_data(restored_client_t restore, struct id
 	parameters = plist_new_dict();
 
 	/* add manifest for current build_identity to parameters */
-	tss_parameters_add_from_manifest(parameters, build_identity);
+	tss_parameters_add_from_manifest(parameters, build_identity, true);
 
 	/* add SE,* tags from info dictionary to parameters */
 	plist_dict_merge(&parameters, p_info);
@@ -2240,7 +2243,7 @@ static plist_t restore_get_savage_firmware_data(restored_client_t restore, struc
 	parameters = plist_new_dict();
 
 	/* add manifest for current build_identity to parameters */
-	tss_parameters_add_from_manifest(parameters, build_identity);
+	tss_parameters_add_from_manifest(parameters, build_identity, true);
 
 	/* add Savage,* tags from info dictionary to parameters */
 	plist_dict_merge(&parameters, p_info);
@@ -2335,7 +2338,7 @@ static plist_t restore_get_yonkers_firmware_data(restored_client_t restore, stru
 	parameters = plist_new_dict();
 
 	/* add manifest for current build_identity to parameters */
-	tss_parameters_add_from_manifest(parameters, build_identity);
+	tss_parameters_add_from_manifest(parameters, build_identity, true);
 
 	/* add Yonkers,* tags from info dictionary to parameters */
 	plist_dict_merge(&parameters, p_info);
@@ -2424,7 +2427,7 @@ static plist_t restore_get_rose_firmware_data(restored_client_t restore, struct 
 	parameters = plist_new_dict();
 
 	/* add manifest for current build_identity to parameters */
-	tss_parameters_add_from_manifest(parameters, build_identity);
+	tss_parameters_add_from_manifest(parameters, build_identity, true);
 
 	plist_dict_set_item(parameters, "ApProductionMode", plist_new_bool(1));
 	if (client->image4supported) {
@@ -2559,7 +2562,7 @@ static plist_t restore_get_veridian_firmware_data(restored_client_t restore, str
 	parameters = plist_new_dict();
 
 	/* add manifest for current build_identity to parameters */
-	tss_parameters_add_from_manifest(parameters, build_identity);
+	tss_parameters_add_from_manifest(parameters, build_identity, true);
 
 	/* add BMU,* tags from info dictionary to parameters */
 	plist_dict_merge(&parameters, p_info);
@@ -2633,6 +2636,29 @@ static plist_t restore_get_veridian_firmware_data(restored_client_t restore, str
 	return response;
 }
 
+static int restore_send_firmware_updater_preflight(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity, plist_t message)
+{
+	plist_t dict = NULL;
+	int restore_error;
+
+	if (idevicerestore_debug) {
+		debug("DEBUG: %s: Got FirmwareUpdaterPreflight request:\n", __func__);
+		debug_plist(message);
+	}
+
+	dict = plist_new_dict();
+
+	info("Sending FirmwareResponsePreflight now...\n");
+	restore_error = restored_send(restore, dict);
+	plist_free(dict);
+	if (restore_error != RESTORE_E_SUCCESS) {
+		error("ERROR: Couldn't send FirmwareResponsePreflight data (%d)\n", restore_error);
+		return -1;
+	}
+
+	info("Done sending FirmwareUpdaterPreflight response\n");
+	return 0;
+}
 static int restore_send_firmware_updater_data(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity, plist_t message)
 {
 
@@ -2748,6 +2774,184 @@ error_out:
 	free(s_updater_name);
 	plist_free(loop_count_dict);
 	return -1;
+}
+
+static int restore_send_receipt_manifest(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity)
+{
+	plist_t dict;
+	int restore_error;
+
+	plist_t manifest = plist_dict_get_item(build_identity, "Manifest");
+	if (!manifest) {
+		error("failed to get Manifest node from build_identity");
+		goto error_out;
+	}
+
+	dict = plist_new_dict();
+	plist_dict_set_item(dict, "ReceiptManifest", plist_copy(manifest));
+
+	info("Sending ReceiptManifest data now...\n");
+	restore_error = restored_send(restore, dict);
+	plist_free(dict);
+	if (restore_error != RESTORE_E_SUCCESS) {
+		error("ERROR: Couldn't send ReceiptManifest data (%d)\n", restore_error);
+		goto error_out;
+	}
+
+	info("Done sending ReceiptManifest data\n");
+
+	return 0;
+
+error_out:
+	return -1;
+}
+
+
+struct cpio_odc_header {
+	char c_magic[6];
+	char c_dev[6];
+	char c_ino[6];
+	char c_mode[6];
+	char c_uid[6];
+	char c_gid[6];
+	char c_nlink[6];
+	char c_rdev[6];
+	char c_mtime[11];
+	char c_namesize[6];
+	char c_filesize[11];
+};
+
+static void octal(char *p, int width, int v)
+{
+	char buf[32];
+	snprintf(buf, 32, "%0*o", width, v);
+	memcpy(p, buf, width);
+}
+
+static int cpio_send_file(idevice_connection_t connection, const char *name, struct stat *st, void *data)
+{
+	struct cpio_odc_header hdr;
+
+	memset(&hdr, '0', sizeof(hdr));
+	memcpy(hdr.c_magic, "070707", 6);
+	octal(hdr.c_dev, 6, st->st_dev);
+	octal(hdr.c_ino, 6, st->st_ino);
+	octal(hdr.c_mode, 6, st->st_mode);
+	octal(hdr.c_uid, 6, st->st_uid);
+	octal(hdr.c_gid, 6, st->st_gid);
+	octal(hdr.c_nlink, 6, st->st_nlink);
+	octal(hdr.c_rdev, 6, st->st_rdev);
+	octal(hdr.c_mtime, 11, st->st_mtime);
+	octal(hdr.c_namesize, 6, strlen(name) + 1);
+	if (data)
+		octal(hdr.c_filesize, 11, st->st_size);
+
+	uint32_t bytes = 0;
+	int name_len = strlen(name) + 1;
+	idevice_error_t device_error;
+
+	device_error = idevice_connection_send(connection, (void *)&hdr, sizeof(hdr), &bytes);
+	if (device_error != IDEVICE_E_SUCCESS || bytes != sizeof(hdr)) {
+		error("ERROR: BootabilityBundle unable to send header. (%d) Sent %u of %lu bytes.\n", device_error, bytes, (long)sizeof(hdr));
+		return -1;
+	}
+
+	device_error = idevice_connection_send(connection, (void *)name, name_len, &bytes);
+	if (device_error != IDEVICE_E_SUCCESS || bytes != name_len) {
+		error("ERROR: BootabilityBundle unable to send filename. (%d) Sent %u of %u bytes.\n", device_error, bytes, name_len);
+		return -1;
+	}
+
+	if (st->st_size && data) {
+		device_error = idevice_connection_send(connection, data, st->st_size, &bytes);
+		if (device_error != IDEVICE_E_SUCCESS || bytes != st->st_size) {
+			error("ERROR: BootabilityBundle unable to send data. (%d) Sent %u of %lu bytes.\n", device_error, bytes, (long)st->st_size);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+static int restore_bootability_send_one(void *ctx, const char *ipsw, const char *name, struct stat *stat)
+{
+	idevice_connection_t connection = (idevice_connection_t)ctx;
+	const char *prefix = "BootabilityBundle/Restore/Bootability/";
+	const char *subpath;
+
+	if (!strcmp(name, "BootabilityBundle/Restore/Firmware/Bootability.dmg.trustcache")) {
+		subpath = "Bootability.trustcache";
+	} else if (strncmp(name, prefix, strlen(prefix))) {
+		return 0;
+	} else {
+		subpath = name + strlen(prefix);
+	}
+
+	debug("DEBUG: BootabilityBundle send m=%07o s=%10ld %s\n", stat->st_mode, (long)stat->st_size, subpath);
+
+	unsigned char *buf = NULL;
+	unsigned int size = 0;
+
+	if ((S_ISLNK(stat->st_mode) || S_ISREG(stat->st_mode)) && stat->st_size != 0) {
+		ipsw_extract_to_memory(ipsw, name, &buf, &size);
+		if (size != stat->st_size) {
+			error("ERROR: expected %ld bytes but got %d for file %s\n", (long)stat->st_size, size, name);
+			free(buf);
+			return -1;
+		}
+	}
+
+	stat->st_uid = stat->st_gid = 0;
+
+	int ret = cpio_send_file(connection, subpath, stat, buf);
+
+	free(buf);
+	return ret;
+}
+
+static int restore_send_bootability_bundle_data(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity, plist_t message, idevice_t device)
+{
+	if (idevicerestore_debug) {
+		debug("DEBUG: %s: Got BootabilityBundle request:\n", __func__);
+		debug_plist(message);
+	}
+
+	plist_t node = plist_dict_get_item(message, "DataPort");
+	uint64_t u64val = 0;
+	plist_get_uint_val(node, &u64val);
+	uint16_t data_port = (uint16_t)u64val;
+
+	int attempts = 10;
+	idevice_connection_t connection = NULL;
+	idevice_error_t device_error = IDEVICE_E_SUCCESS;
+
+	debug("Connecting to BootabilityBundle data port\n");
+	while (--attempts > 0) {
+		device_error = idevice_connect(device, data_port, &connection);
+		if (device_error == IDEVICE_E_SUCCESS) {
+			break;
+		}
+		sleep(1);
+		debug("Retrying connection...\n");
+	}
+	if (device_error != IDEVICE_E_SUCCESS) {
+		error("ERROR: Unable to connect to BootabilityBundle data port\n");
+		return -1;
+	}
+
+	int ret = ipsw_list_contents(client->ipsw, restore_bootability_send_one, connection);
+
+	if (ret < 0) {
+		error("ERROR: Failed to send BootabilityBundle\n");
+		return ret;
+	}
+
+	struct stat st = {.st_nlink = 1};
+	cpio_send_file(connection, "TRAILER!!!", &st, NULL);
+
+	idevice_disconnect(connection);
+
+    return 0;
 }
 
 plist_t restore_get_build_identity(struct idevicerestore_client_t* client, uint8_t is_recover_os) {
@@ -3145,7 +3349,6 @@ int restore_send_buildidentity(restored_client_t restore, struct idevicerestore_
 
 int restore_handle_data_request_msg(struct idevicerestore_client_t* client, idevice_t device, restored_client_t restore, plist_t message, plist_t build_identity, const char* filesystem)
 {
-
 	plist_t node = NULL;
 
 	// checks and see what kind of data restored is requests and pass
@@ -3244,7 +3447,7 @@ int restore_handle_data_request_msg(struct idevicerestore_client_t* client, idev
 
 		else if (!strcmp(type, "NORData")) {
 			if((client->flags & FLAG_EXCLUDE) == 0) {
-				if(restore_send_nor(restore, client, build_identity) < 0) {
+				if(restore_send_nor(restore, client, build_identity, message) < 0) {
 					error("ERROR: Unable to send NOR data\n");
 					return -1;
 				}
@@ -3275,6 +3478,13 @@ int restore_handle_data_request_msg(struct idevicerestore_client_t* client, idev
 			}
 		}
 
+		else if (!strcmp(type, "FirmwareUpdaterPreflight")) {
+			if(restore_send_firmware_updater_preflight(restore, client, build_identity, message) < 0) {
+				error("ERROR: Unable to send FirmwareUpdaterPreflight\n");
+				return -1;
+			}
+		}
+
 		else if (!strcmp(type, "FirmwareUpdaterData")) {
 			if(restore_send_firmware_updater_data(restore, client, build_identity, message) < 0) {
 				error("ERROR: Unable to send FirmwareUpdater data\n");
@@ -3292,6 +3502,27 @@ int restore_handle_data_request_msg(struct idevicerestore_client_t* client, idev
 		else if (!strcmp(type, "EANData")) {
 			if(restore_send_image_data(restore, client, build_identity, message, "EANImageList", "IsEarlyAccessFirmware", "EANData") < 0) {
 				error("ERROR: Unable to send Personalized data\n");
+				return -1;
+			}
+		}
+
+		else if (!strcmp(type, "BootabilityBundle")) {
+			if (restore_send_bootability_bundle_data(restore, client, build_identity, message, device) < 0) {
+				error("ERROR: Unable to send BootabilityBundle data\n");
+				return -1;
+			}
+		}
+
+		else if (!strcmp(type, "ReceiptManifest")) {
+			if (restore_send_receipt_manifest(restore, client, build_identity) < 0) {
+				error("ERROR: Unable to send ReceiptManifest data\n");
+				return -1;
+			}
+		}
+
+		else if (!strcmp(type, "BasebandUpdaterOutputData")) {
+			if (restore_handle_baseband_updater_output_data(restore, client, device, message) < 0) {
+				error("ERROR: Unable to send BasebandUpdaterOutputData data\n");
 				return -1;
 			}
 		}
@@ -3764,6 +3995,6 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 		}
 	}
 
-	restore_client_free(client);
+	//restore_client_free(client);
 	return err;
 }

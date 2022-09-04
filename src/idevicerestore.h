@@ -59,6 +59,11 @@ enum {
 	RESTORE_NUM_STEPS
 };
 
+// lpol_file has been extracted from the IMG4 dump of the ac2 usb protocol. It is not present in the .ipsw and
+// represents and empty "local policy". See https://support.apple.com/guide/security/contents-a-localpolicy-file-mac-apple-silicon-secc745a0845/web.
+extern const uint8_t lpol_file[22];
+extern const uint32_t lpol_file_length;
+
 typedef void (*idevicerestore_progress_cb_t)(int step, double step_progress, void* userdata);
 
 struct idevicerestore_client_t* idevicerestore_client_new(void);
@@ -84,6 +89,13 @@ int is_image4_supported(struct idevicerestore_client_t* client);
 int get_ap_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, int* nonce_size);
 int get_sep_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, int* nonce_size);
 int get_tss_response(struct idevicerestore_client_t* client, plist_t build_identity, plist_t* tss);
+int get_local_policy_tss_response(struct idevicerestore_client_t* client, plist_t build_identity, plist_t* tss);
+int get_recoveryos_root_ticket_tss_response(struct idevicerestore_client_t* client, plist_t build_identity, plist_t* tss);
+int get_recovery_os_local_policy_tss_response(
+		struct idevicerestore_client_t* client,
+		plist_t build_identity,
+		plist_t* tss,
+		plist_t args);
 void fixup_tss(plist_t tss);
 int build_manifest_get_identity_count(plist_t build_manifest);
 int build_manifest_check_compatibility(plist_t build_manifest, const char* product);

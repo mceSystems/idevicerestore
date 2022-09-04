@@ -21,6 +21,7 @@
 
 #include "thread.h"
 
+#if 0
 int thread_new(thread_t *thread, thread_func_t thread_func, void* data)
 {
 #ifdef WIN32
@@ -175,3 +176,4 @@ int cond_wait_timeout(cond_t* cond, mutex_t* mutex, unsigned int timeout_ms)
 	return pthread_cond_timedwait(cond, mutex, &ts);
 #endif
 }
+#endif
