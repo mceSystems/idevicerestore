@@ -33,7 +33,6 @@
 #include "common.h"
 #include "normal.h"
 #include "recovery.h"
-#include "thread.h"
 
 static int normal_idevice_new(struct idevicerestore_client_t* client, idevice_t* device)
 {
@@ -42,6 +41,7 @@ static int normal_idevice_new(struct idevicerestore_client_t* client, idevice_t*
 	idevice_t dev = NULL;
 	idevice_error_t device_error;
 	lockdownd_client_t lockdown = NULL;
+	plist_t node = NULL;
 
 	*device = NULL;
 
@@ -66,6 +66,10 @@ static int normal_idevice_new(struct idevicerestore_client_t* client, idevice_t*
 			return -1;
 		}
 		free(type);
+		if (lockdownd_get_value(lockdown, NULL, "UniqueChipID", &node) == LOCKDOWN_E_SUCCESS) {
+			plist_get_uint_val(node, &client->ecid);
+			plist_free(node);
+		}
 		lockdownd_client_free(lockdown);
 		lockdown = NULL;
 
@@ -108,7 +112,7 @@ static int normal_idevice_new(struct idevicerestore_client_t* client, idevice_t*
 		}
 		free(type);
 
-		plist_t node = NULL;
+		node = NULL;
 		if ((lockdownd_get_value(lockdown, NULL, "UniqueChipID", &node) != LOCKDOWN_E_SUCCESS) || !node || (plist_get_node_type(node) != PLIST_UINT)){
 			if (node) {
 				plist_free(node);
@@ -138,7 +142,8 @@ static int normal_idevice_new(struct idevicerestore_client_t* client, idevice_t*
 	return 0;
 }
 
-int normal_check_mode(struct idevicerestore_client_t* client) {
+int normal_check_mode(struct idevicerestore_client_t* client)
+{
 	idevice_t device = NULL;
 
 	normal_idevice_new(client, &device);
@@ -210,7 +215,6 @@ irecv_device_t normal_get_irecv_device(struct idevicerestore_client_t* client)
 
 int normal_enter_recovery(struct idevicerestore_client_t* client)
 {
-	info("normal_enter_recovery... lockdownd_enter_recovery:%x \n",lockdownd_enter_recovery);
 	idevice_t device = NULL;
 	lockdownd_client_t lockdown = NULL;
 	idevice_error_t device_error = IDEVICE_E_SUCCESS;
@@ -230,14 +234,13 @@ int normal_enter_recovery(struct idevicerestore_client_t* client)
 	}
 
 	/* unpair the device */
-	//lockdown_error = lockdownd_unpair(lockdown, NULL);
-	//if (lockdown_error != LOCKDOWN_E_SUCCESS) {
-	//	error("WARNING: Could not unpair device\n");
-	//}
-	info("lockdownd_enter_recovery %x ...\n",lockdownd_enter_recovery);
+	lockdown_error = lockdownd_unpair(lockdown, NULL);
+	if (lockdown_error != LOCKDOWN_E_SUCCESS) {
+		error("WARNING: Could not unpair device\n");
+	}
+
 	lockdown_error = lockdownd_enter_recovery(lockdown);
 	if (lockdown_error == LOCKDOWN_E_SESSION_INACTIVE) {
-		info("lockdownd_enter_recovery %x LOCKDOWN_E_SESSION_INACTIVE...\n",lockdownd_enter_recovery);
 		lockdownd_client_free(lockdown);
 		lockdown = NULL;
 		if (LOCKDOWN_E_SUCCESS != (lockdown_error = lockdownd_client_new_with_handshake(device, &lockdown, "idevicerestore"))) {
@@ -262,7 +265,7 @@ int normal_enter_recovery(struct idevicerestore_client_t* client)
 	mutex_lock(&client->device_event_mutex);
 	debug("DEBUG: Waiting for device to disconnect...\n");
 	cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 60000);
-	if (client->mode == &idevicerestore_modes[MODE_NORMAL] || (client->flags & FLAG_QUIT)) {
+	if (client->mode == MODE_NORMAL || (client->flags & FLAG_QUIT)) {
 		mutex_unlock(&client->device_event_mutex);
 		error("ERROR: Failed to place device in recovery mode\n");
 		return -1;
@@ -270,7 +273,7 @@ int normal_enter_recovery(struct idevicerestore_client_t* client)
 
 	debug("DEBUG: Waiting for device to connect in recovery mode...\n");
 	cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 60000);
-	if (client->mode != &idevicerestore_modes[MODE_RECOVERY] || (client->flags & FLAG_QUIT)) {
+	if (client->mode != MODE_RECOVERY || (client->flags & FLAG_QUIT)) {
 		mutex_unlock(&client->device_event_mutex);
 		error("ERROR: Failed to enter recovery mode\n");
 		return -1;
@@ -364,34 +367,32 @@ int normal_is_image4_supported(struct idevicerestore_client_t* client)
 	return bval;
 }
 
-int normal_get_ecid(struct idevicerestore_client_t* client, uint64_t* ecid)
-{
-	plist_t unique_chip_node = normal_get_lockdown_value(client, NULL, "UniqueChipID");
-	if (!unique_chip_node || plist_get_node_type(unique_chip_node) != PLIST_UINT) {
-		error("ERROR: Unable to get ECID\n");
-		return -1;
-	}
-	plist_get_uint_val(unique_chip_node, ecid);
-	plist_free(unique_chip_node);
-
-	return 0;
-}
-
 int normal_get_preflight_info(struct idevicerestore_client_t* client, plist_t *preflight_info)
 {
-	plist_t node = normal_get_lockdown_value(client, NULL, "FirmwarePreflightInfo");
-	if (!node || plist_get_node_type(node) != PLIST_DICT) {
-		error("ERROR: Unable to get FirmwarePreflightInfo\n");
-		return -1;
+	uint8_t has_telephony_capability = 0;
+	plist_t node;
+
+	node = normal_get_lockdown_value(client, NULL, "TelephonyCapability");
+	plist_get_bool_val(node, &has_telephony_capability);
+	plist_free(node);
+
+	if (has_telephony_capability) {
+		node = normal_get_lockdown_value(client, NULL, "FirmwarePreflightInfo");
+		if (!node || plist_get_node_type(node) != PLIST_DICT) {
+			error("ERROR: Unable to get FirmwarePreflightInfo\n");
+			return -1;
+		}
+		*preflight_info = node;
+	} else {
+		debug("DEBUG: Device does not have TelephonyCapability, no FirmwarePreflightInfo\n");
+		*preflight_info = NULL;
 	}
-	*preflight_info = node;
 
 	return 0;
 }
 
 int normal_handle_create_stashbag(struct idevicerestore_client_t* client, plist_t manifest)
 {
-	info("normal_handle_create_stashbag");
 	int result = -1;
 
 	idevice_t device = NULL;
@@ -516,7 +517,6 @@ int normal_handle_create_stashbag(struct idevicerestore_client_t* client, plist_
 
 int normal_handle_commit_stashbag(struct idevicerestore_client_t* client, plist_t manifest)
 {
-	info("normal_handle_commit_stashbag");
 	int result = -1;
 
 	idevice_t device = NULL;
@@ -581,7 +581,6 @@ int normal_handle_commit_stashbag(struct idevicerestore_client_t* client, plist_
 	if (perr != PREBOARD_E_SUCCESS) {
 		error("ERROR: could not receive from preboard service (%d)\n", perr);
 	} else {
-		int commit_complete = 0;
 		plist_t node = plist_dict_get_item(pl, "Error");
 		if (node) {
 			char *strval = NULL;

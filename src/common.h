@@ -37,16 +37,23 @@ extern "C" {
 
 #include <plist/plist.h>
 #include <libirecovery.h>
+#include <libimobiledevice-glue/thread.h>
 
 #include "idevicerestore.h"
-#include "thread.h"
 
-#define MODE_UNKNOWN        -1
-#define MODE_WTF             0
-#define MODE_DFU             1
-#define MODE_RECOVERY        2
-#define MODE_RESTORE         3
-#define MODE_NORMAL          4
+#define _MODE_UNKNOWN         0
+#define _MODE_WTF             1
+#define _MODE_DFU             2
+#define _MODE_RECOVERY        3
+#define _MODE_RESTORE         4
+#define _MODE_NORMAL          5
+
+#define MODE_UNKNOWN  &idevicerestore_modes[_MODE_UNKNOWN]
+#define MODE_WTF      &idevicerestore_modes[_MODE_WTF]
+#define MODE_DFU      &idevicerestore_modes[_MODE_DFU]
+#define MODE_RECOVERY &idevicerestore_modes[_MODE_RECOVERY]
+#define MODE_RESTORE  &idevicerestore_modes[_MODE_RESTORE]
+#define MODE_NORMAL   &idevicerestore_modes[_MODE_NORMAL]
 
 #define FLAG_QUIT            1
 
@@ -90,6 +97,7 @@ struct idevicerestore_client_t {
 	unsigned char* nonce;
 	int nonce_size;
 	int image4supported;
+	plist_t build_manifest;
 	plist_t preflight_info;
 	char* udid;
 	char* srnm;
@@ -115,6 +123,8 @@ struct idevicerestore_client_t {
 	mutex_t device_event_mutex;
 	cond_t device_event_cond;
 	int ignore_device_add_events;
+	plist_t macos_variant;
+	char* restore_variant;
 };
 
 extern struct idevicerestore_mode_t idevicerestore_modes[];

@@ -45,7 +45,6 @@ idevicerestore_SOURCES = \
 	download.c download.h \
 	locking.c locking.h \
 	socket.c socket.h \
-	thread.c thread.h \
 	jsmn.c jsmn.h \
 	json_plist.c json_plist.h
 if USE_INTERNAL_SHA1

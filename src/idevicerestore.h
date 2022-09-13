@@ -45,6 +45,11 @@ extern "C" {
 #define FLAG_INTERACTIVE     (1 << 9)
 #define FLAG_ALLOW_RESTORE_MODE (1 << 10)
 #define FLAG_NO_RESTORE      (1 << 11)
+#define FLAG_IGNORE_ERRORS   (1 << 12)
+
+#define RESTORE_VARIANT_ERASE_INSTALL      "Erase Install (IPSW)"
+#define RESTORE_VARIANT_UPGRADE_INSTALL    "Upgrade Install (IPSW)"
+#define RESTORE_VARIANT_MACOS_RECOVERY_OS  "macOS Customer"
 
 struct idevicerestore_client_t;
 
@@ -82,7 +87,6 @@ void idevicerestore_set_debug_stream(FILE* strm);
 int idevicerestore_start(struct idevicerestore_client_t* client);
 const char* idevicerestore_get_error(void);
 
-int check_mode(struct idevicerestore_client_t* client);
 irecv_device_t get_irecv_device(struct idevicerestore_client_t* client);
 int get_ecid(struct idevicerestore_client_t* client, uint64_t* ecid);
 int is_image4_supported(struct idevicerestore_client_t* client);
@@ -101,7 +105,7 @@ int build_manifest_get_identity_count(plist_t build_manifest);
 int build_manifest_check_compatibility(plist_t build_manifest, const char* product);
 void build_manifest_get_version_information(plist_t build_manifest, struct idevicerestore_client_t* client);
 plist_t build_manifest_get_build_identity_for_model(plist_t build_manifest, const char *hardware_model);
-plist_t build_manifest_get_build_identity_for_model_with_restore_behavior(plist_t build_manifest, const char *hardware_model, const char *behavior);
+plist_t build_manifest_get_build_identity_for_model_with_variant(plist_t build_manifest, const char *hardware_model, const char *variant, int exact);
 int build_manifest_get_build_count(plist_t build_manifest);
 void build_identity_print_information(plist_t build_identity);
 int build_identity_check_components_in_ipsw(plist_t build_identity, const char* ipsw);

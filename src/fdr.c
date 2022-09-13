@@ -28,8 +28,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <libimobiledevice/libimobiledevice.h>
+#include <libimobiledevice-glue/socket.h>
 
-#include "socket.h" /* from libimobiledevice/common */
 #include "common.h"
 #include "idevicerestore.h"
 #include "fdr.h"
@@ -415,7 +415,7 @@ static int fdr_handle_sync_cmd(fdr_client_t fdr_ctrl)
 {
 	idevice_error_t device_error = IDEVICE_E_SUCCESS;
 	fdr_client_t fdr;
-	thread_t fdr_thread = (thread_t)NULL;
+	THREAD_T fdr_thread = THREAD_T_NULL;
 	int res = 0;
 	uint32_t bytes = 0;
 	char buf[4096];
@@ -549,7 +549,7 @@ static int fdr_handle_proxy_cmd(fdr_client_t fdr)
 	}
 
 	/* else wait for messages and forward them */
-	int sockfd = idevicerestore_socket_connect(host, port);
+	int sockfd = socket_connect(host, port);
 	free(host);
 	if (sockfd < 0) {
 		free(buf);
@@ -579,7 +579,7 @@ static int fdr_handle_proxy_cmd(fdr_client_t fdr)
 			debug("Sending %u bytes of data\n", bytes);
 			sent = 0;
 			while (sent < bytes) {
-				int s = idevicerestore_socket_send(sockfd, buf + sent, bytes - sent);
+				int s = socket_send(sockfd, buf + sent, bytes - sent);
 				if (s < 0) {
 					break;
 				}
@@ -587,18 +587,20 @@ static int fdr_handle_proxy_cmd(fdr_client_t fdr)
 			}
 			if (sent != bytes) {
 				error("ERROR: Sending proxy payload failed: %s. Sent %u of %u bytes. \n", strerror(errno), sent, bytes);
-				idevicerestore_socket_close(sockfd);
+				socket_close(sockfd);
 				res = -1;
 				break;
 			}
 		}
-		bytes_ret = idevicerestore_socket_receive_timeout(sockfd, buf, bufsize, 0, 1000);
-		if (bytes_ret < 0) {
-			if (errno)
-				error("ERROR: FDR %p receiving proxy payload failed: %s\n",
-				      fdr, strerror(errno));
-			else
-				res = 1; /* close connection if no data with no error */
+		bytes_ret = socket_receive_timeout(sockfd, buf, bufsize, 0, 100);
+		if (bytes_ret == -ETIMEDOUT) {
+			bytes_ret = 0;
+		} else if (bytes_ret == -ECONNRESET) {
+			res = 1;
+			break;
+		} else if (bytes_ret < 0) {
+			error("ERROR: FDR %p receiving proxy payload failed: %d (%s)\n",
+			      fdr, bytes_ret, strerror(-bytes_ret));
 			break;
 		}
 
@@ -623,7 +625,7 @@ static int fdr_handle_proxy_cmd(fdr_client_t fdr)
 			}
 		} else serial++;
 	}
-	idevicerestore_socket_close(sockfd);
+	socket_close(sockfd);
 	free(buf);
 	return res;
 }
