@@ -624,6 +624,8 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			// we need to refresh the current mode again
 			mutex_lock(&client->device_event_mutex);
 			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 60000);
+			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+
 			if (client->mode == MODE_UNKNOWN || (client->flags & FLAG_QUIT)) {
 				mutex_unlock(&client->device_event_mutex);
 				error("ERROR: Unable to discover device mode. Please make sure a device is attached.\n");
@@ -1271,6 +1273,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 
 		debug("Waiting for device to disconnect...\n");
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 60000);
+		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
 		if (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
 
@@ -1368,6 +1371,10 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		mutex_lock(&client->device_event_mutex);
 		info("Waiting for device to enter restore mode...\n");
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 180000);
+		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+
+
 		if (client->mode != MODE_RESTORE || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
 			error("ERROR: Device failed to enter restore mode.\n");
