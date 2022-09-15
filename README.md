@@ -2,13 +2,15 @@
 
 *A command-line application to restore firmware files to iOS devices.*
 
+![](https://github.com/libimobiledevice/idevicerestore/actions/workflows/build.yml/badge.svg)
+
 ## Features
 
 The idevicerestore application is a full reimplementation of all granular steps
 which are performed during the restore of a firmware to a device.
 
 In general, upgrades and downgrades are possible, however subject to
-availability of SHSH blobs from Apple for signing the firmare files.
+availability of SHSH blobs from Apple for signing the firmware files.
 
 Some key features are:
 
@@ -39,6 +41,7 @@ First install all required dependencies and build tools:
 ```shell
 sudo apt-get install \
 	build-essential \
+	pkg-config \
 	checkinstall \
 	git \
 	autoconf \
@@ -48,6 +51,7 @@ sudo apt-get install \
 	libusb-1.0-0-dev \
 	libplist-dev \
 	libimobiledevice-dev \
+	libimobiledevice-glue-dev \
 	libcurl4-openssl-dev \
 	libssl-dev \
 	libzip-dev \
@@ -134,7 +138,7 @@ ticket first to discuss the idea upfront to ensure less effort for everyone.
 
 Please make sure your contribution adheres to:
 * Try to follow the code style of the project
-* Commit messages should describe the change well without being to short
+* Commit messages should describe the change well without being too short
 * Try to split larger changes into individual commits of a common domain
 * Use your real name and a valid email address for your commits
 
@@ -162,4 +166,4 @@ iPadOS, tvOS, watchOS, and macOS are trademarks of Apple Inc.
 This project is an independent software application and has not been
 authorized, sponsored, or otherwise approved by Apple Inc.
 
-README Updated on: 2020-06-12
+README Updated on: 2022-04-04

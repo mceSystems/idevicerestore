@@ -69,4 +69,8 @@
         #define UINT64_C(v) v ##UI64
         #define INT64_C(v) v ##I64
     #endif
+<<<<<<< HEAD
 #endif
+=======
+#endif
+>>>>>>> d0921e4b468500874773561a341cd662e3fb73fa

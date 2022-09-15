@@ -291,4 +291,8 @@ void SHA1(
     for (ii=0; ii<len; ii+=1)
         SHA1Update(&ctx, str + ii, 1);
     SHA1Final(hash_out, &ctx);
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> d0921e4b468500874773561a341cd662e3fb73fa

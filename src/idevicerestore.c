@@ -2811,4 +2811,8 @@ const char* get_component_name(const char* filename)
 	}
 	error("WARNING: Unhandled component '%s'", filename);
 	return NULL;
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> d0921e4b468500874773561a341cd662e3fb73fa

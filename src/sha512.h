@@ -29,4 +29,8 @@ int sha384_final(sha384_context * md, unsigned char *out);
 int sha384_update(sha384_context * md, const unsigned char *in, size_t inlen);
 int sha384(const unsigned char *message, size_t message_len, unsigned char *out);
 
+<<<<<<< HEAD
 #endif
+=======
+#endif
+>>>>>>> d0921e4b468500874773561a341cd662e3fb73fa

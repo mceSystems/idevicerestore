@@ -694,4 +694,8 @@ int _plist_dict_copy_item(plist_t target_dict, plist_t source_dict, const char *
 	}
 	plist_dict_set_item(target_dict, key, plist_copy(node));
 	return 0;
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> d0921e4b468500874773561a341cd662e3fb73fa
