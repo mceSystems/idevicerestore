@@ -57,12 +57,12 @@
 #define MAX_PRINT_LEN 64*1024
 
 struct idevicerestore_mode_t idevicerestore_modes[] = {
-	{  0, "WTF"      },
-	{  1, "DFU"      },
-	{  2, "Recovery" },
-	{  3, "Restore"  },
-	{  4, "Normal"   },
-	{ -1,  NULL      }
+	{  0, "Unknown"  },
+	{  1, "WTF"      },
+	{  2, "DFU"      },
+	{  3, "Recovery" },
+	{  4, "Restore"  },
+	{  5, "Normal"   },
 };
 
 int idevicerestore_debug = 0;
@@ -78,52 +78,37 @@ static int info_disabled = 0;
 static int error_disabled = 0;
 static int debug_disabled = 0;
 
-
-
-void Printf(const char* header,const char* format,va_list vargs)
-{
-	char pOut[2048];
-	int threadID = pthread_self() ;
-	vsnprintf(pOut,2048, format, vargs);
-	printf("\n(%d) t:%d %s:%s",threadID,GetTickCount(),header,pOut);
-}
-
 void info(const char* format, ...)
 {
 	if (info_disabled) return;
 	va_list vargs;
 	va_start(vargs, format);
-	//vfprintf((info_stream) ? info_stream : stdout, format, vargs);
-	Printf("Info",format,vargs);
-	
+	vfprintf((info_stream) ? info_stream : stdout, format, vargs);
 	va_end(vargs);
 }
 
 void error(const char* format, ...)
 {
-	
 	va_list vargs, vargs2;
 	va_start(vargs, format);
-	Printf("Error",format,vargs);
-	//va_copy(vargs2, vargs);
-	//vsnprintf(idevicerestore_err_buff, idevicerestore_err_buff_size, format, vargs);
+	va_copy(vargs2, vargs);
+	vsnprintf(idevicerestore_err_buff, idevicerestore_err_buff_size, format, vargs);
 	va_end(vargs);
-	//if (!error_disabled) {
-	//	vfprintf((error_stream) ? error_stream : stderr, format, vargs2);
-	//}
-	//va_end(vargs2);
+	if (!error_disabled) {
+		vfprintf((error_stream) ? error_stream : stderr, format, vargs2);
+	}
+	va_end(vargs2);
 }
 
 void debug(const char* format, ...)
 {
-	//if (debug_disabled) return;
-	//if (!idevicerestore_debug) {
-	//	return;
-	//}
+	if (debug_disabled) return;
+	if (!idevicerestore_debug) {
+		return;
+	}
 	va_list vargs;
 	va_start(vargs, format);
-	//vfprintf((debug_stream) ? debug_stream : stderr, format, vargs);
-	Printf("Debug",format,vargs);
+	vfprintf((debug_stream) ? debug_stream : stderr, format, vargs);
 	va_end(vargs);
 }
 
@@ -579,7 +564,7 @@ uint64_t _plist_dict_get_uint(plist_t dict, const char *key)
 	uint64_t strsz = 0;
 	plist_t node = plist_dict_get_item(dict, key);
 	if (!node) {
-		return (uint64_t)-1LL;
+		return uintval;
 	}
 	switch (plist_get_node_type(node)) {
 	case PLIST_UINT:
