@@ -4341,8 +4341,6 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 			}
 			if (ckpt_complete)
 				info("Checkpoint %" PRIu64 " complete with code %" PRIu64 "\n", ckpt_id, ckpt_res);
-			debug("WTF !!!");
-			info("WTF !!!!!!!");
 		}
 
 		// baseband update message
@@ -4375,7 +4373,6 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 #else
 	if (thread_alive(fdr_thread)) {
 		if (fdr_control_channel) {
-			debug("fdr_disconnect");
 			fdr_disconnect(fdr_control_channel);
 			debug("thread_join");
 			thread_join(fdr_thread);
