@@ -45,18 +45,9 @@ idevicerestore_SOURCES = \
 	limera1n_payload.h \
 	limera1n.c limera1n.h \
 	download.c download.h \
-<<<<<<< HEAD
-	locking.c locking.h \
-	socket.c socket.h \
-	jsmn.c jsmn.h \
-	json_plist.c json_plist.h
-if USE_INTERNAL_SHA1
-idevicerestore_SOURCES += sha1.c sha1.h
-=======
 	locking.c locking.h
 if USE_INTERNAL_SHA
 idevicerestore_SOURCES += sha1.c sha1.h sha512.c sha512.h fixedint.h
->>>>>>> d0921e4b468500874773561a341cd662e3fb73fa
 endif
 idevicerestore_CFLAGS = $(AM_CFLAGS)
 idevicerestore_LDFLAGS = $(AM_LDFLAGS)

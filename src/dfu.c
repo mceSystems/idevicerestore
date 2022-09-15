@@ -167,6 +167,7 @@ int dfu_send_component(struct idevicerestore_client_t* client, plist_t build_ide
 		free(component_data);
 		return -1;
 	}
+	debug("dfu_send_component free component_data");
 	free(component_data);
 	component_data = NULL;
 
@@ -392,8 +393,13 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 
 	if (client->build_major > 8) {
 		/* reconnect */
-		debug("Waiting for device to disconnect...\n");
+		debug("Waiting for device to disconnect...1\n");
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 10000);
+		int tries = 3 ;
+		while(tries-- && (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT))) {
+			debug("cond_wait_timeout retry\n");
+			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+		}
 		if (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
 			if (!(client->flags & FLAG_QUIT)) {
@@ -403,6 +409,11 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 		}
 		debug("Waiting for device to reconnect...\n");
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 10000);
+		tries = 3 ;
+		while(tries-- && ((client->mode != MODE_DFU && client->mode != MODE_RECOVERY) || (client->flags & FLAG_QUIT))) {
+			debug("cond_wait_timeout retry\n");
+			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+		}
 		if ((client->mode != MODE_DFU && client->mode != MODE_RECOVERY) || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
 			if (!(client->flags & FLAG_QUIT)) {
@@ -552,8 +563,14 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 		dfu_client_free(client);
 	}
 
-	debug("Waiting for device to disconnect...\n");
+	debug("Waiting for device to disconnect...2\n");
 	cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 10000);
+	int tries = 3 ;
+	while(tries-- && (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT))) {
+		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+	}
+
+	
 	if (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT)) {
 		mutex_unlock(&client->device_event_mutex);
 		if (!(client->flags & FLAG_QUIT)) {
@@ -563,6 +580,13 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 	}
 	debug("Waiting for device to reconnect in recovery mode...\n");
 	cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 10000);
+	tries = 3 ;
+	while(tries-- && (client->mode != MODE_RECOVERY || (client->flags & FLAG_QUIT))) {
+		debug("cond_wait_timeout retry\n");
+		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+	}
+
+
 	if (client->mode != MODE_RECOVERY || (client->flags & FLAG_QUIT)) {
 		mutex_unlock(&client->device_event_mutex);
 		if (!(client->flags & FLAG_QUIT)) {

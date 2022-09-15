@@ -311,8 +311,4 @@ int sha384(const unsigned char *message, size_t message_len, unsigned char *out)
     if ((ret = sha384_update(&ctx, message, message_len))) return ret;
     if ((ret = sha384_final(&ctx, out))) return ret;
     return 0;
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> d0921e4b468500874773561a341cd662e3fb73fa

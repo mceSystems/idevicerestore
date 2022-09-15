@@ -1269,8 +1269,16 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		}
 		recovery_client_free(client);
 
-		debug("Waiting for device to disconnect...\n");
+		debug("Waiting for device to disconnect...3\n");
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 60000);
+		int tries = 3 ;
+		while(tries-- && (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT))) {
+			debug("cond_wait_timeout retry\n");
+			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+		}
+		
+
+
 		if (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
 
@@ -1283,6 +1291,11 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		}
 		debug("Waiting for device to reconnect in recovery mode...\n");
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 60000);
+		tries = 3 ;
+		while(tries-- && (client->mode != MODE_RECOVERY || (client->flags & FLAG_QUIT))) {
+			debug("cond_wait_timeout retry\n");
+			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+		}
 		if (client->mode != MODE_RECOVERY || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
 			if (!(client->flags & FLAG_QUIT)) {
@@ -1368,6 +1381,11 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		mutex_lock(&client->device_event_mutex);
 		info("Waiting for device to enter restore mode...\n");
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 180000);
+		int tries = 3 ;
+		while(tries-- && (client->mode != MODE_RESTORE || (client->flags & FLAG_QUIT))) {
+			debug("cond_wait_timeout retry\n");
+			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+		}
 		if (client->mode != MODE_RESTORE || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
 			error("ERROR: Device failed to enter restore mode.\n");
@@ -1779,6 +1797,7 @@ int main(int argc, char* argv[]) {
 
 irecv_device_t get_irecv_device(struct idevicerestore_client_t *client)
 {
+	info("get_irecv_device");
 	int mode = _MODE_UNKNOWN;
 
 	if (client->mode) {
@@ -2590,6 +2609,7 @@ int personalize_component(const char *component_name, const unsigned char* compo
 			}
 		}
 	}
+	debug("personalize_component free blob");
 	free(component_blob);
 
 	if (idevicerestore_keep_pers) {
@@ -2598,6 +2618,7 @@ int personalize_component(const char *component_name, const unsigned char* compo
 
 	*personalized_component = stitched_component;
 	*personalized_component_size = stitched_component_size;
+	debug("personalize_component return 0");
 	return 0;
 }
 
@@ -2811,8 +2832,4 @@ const char* get_component_name(const char* filename)
 	}
 	error("WARNING: Unhandled component '%s'", filename);
 	return NULL;
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> d0921e4b468500874773561a341cd662e3fb73fa

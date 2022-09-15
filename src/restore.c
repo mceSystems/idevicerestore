@@ -179,7 +179,7 @@ static int restore_idevice_new(struct idevicerestore_client_t* client, idevice_t
 		}
 		device_error = idevice_new(&dev, devices[j]);
 		if (device_error != IDEVICE_E_SUCCESS) {
-			debug("%s: can't open device with UDID %s\n", __func__, devices[j]);
+			debug("%s: 5 can't open device with UDID %s\n", __func__, devices[j]);
 			continue;
 		}
 
@@ -387,7 +387,7 @@ static int restore_is_current_device(struct idevicerestore_client_t* client, con
 
 	device_error = idevice_new(&device, udid);
 	if (device_error != IDEVICE_E_SUCCESS) {
-		debug("%s: can't open device with UDID %s\n", __func__, udid);
+		debug("%s: 6 can't open device with UDID %s\n", __func__, udid);
 		return 0;
 	}
 
@@ -707,7 +707,7 @@ int restore_handle_progress_msg(struct idevicerestore_client_t* client, plist_t 
 			break;
 		}
 	} else {
-		info("%s (%d)\n", restore_progress_string(adapted_operation), (int)operation);
+		info("%s (%d) progress:%d\n", restore_progress_string(adapted_operation), (int)operation, (int) progress);
 	}
 	lastop = (int)operation;
 
@@ -4341,6 +4341,8 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 			}
 			if (ckpt_complete)
 				info("Checkpoint %" PRIu64 " complete with code %" PRIu64 "\n", ckpt_id, ckpt_res);
+			debug("WTF !!!");
+			info("WTF !!!!!!!");
 		}
 
 		// baseband update message
@@ -4360,24 +4362,28 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 			//if (idevicerestore_debug)
 				debug_plist(message);
 		}
-
+		debug("free type");
 		free(type);
+		debug("fplist_free");
 		plist_free(message);
 		message = NULL;
 	}
 
 #ifdef HAVE_REVERSE_PROXY
+	debug("reverse_proxy_client_free");
 	reverse_proxy_client_free(rproxy);
 #else
 	if (thread_alive(fdr_thread)) {
 		if (fdr_control_channel) {
+			debug("fdr_disconnect");
 			fdr_disconnect(fdr_control_channel);
+			debug("thread_join");
 			thread_join(fdr_thread);
 			fdr_control_channel = NULL;
 		}
 	}
 #endif
 
-	restore_client_free(client);
+	//restore_client_free(client);
 	return err;
 }

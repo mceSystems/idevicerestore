@@ -36,6 +36,7 @@
 
 static int normal_idevice_new(struct idevicerestore_client_t* client, idevice_t* device)
 {
+	
 	int num_devices = 0;
 	char **devices = NULL;
 	idevice_t dev = NULL;
@@ -48,7 +49,7 @@ static int normal_idevice_new(struct idevicerestore_client_t* client, idevice_t*
 	if (client->udid) {
 		device_error = idevice_new(&dev, client->udid);
 		if (device_error != IDEVICE_E_SUCCESS) {
-			debug("%s: can't open device with UDID %s\n", __func__, client->udid);
+			debug("%s: 3 can't open device with UDID %s\n", __func__, client->udid);
 			return -1;
 		}
 
@@ -93,7 +94,7 @@ static int normal_idevice_new(struct idevicerestore_client_t* client, idevice_t*
 		}
 		device_error = idevice_new(&dev, devices[j]);
 		if (device_error != IDEVICE_E_SUCCESS) {
-			debug("%s: can't open device with UDID %s\n", __func__, devices[j]);
+			debug("%s: 4 can't open device with UDID %s\n", __func__, devices[j]);
 			continue;
 		}
 
@@ -144,19 +145,22 @@ static int normal_idevice_new(struct idevicerestore_client_t* client, idevice_t*
 
 int normal_check_mode(struct idevicerestore_client_t* client)
 {
+	debug("normal chcek mode");
 	idevice_t device = NULL;
 
 	normal_idevice_new(client, &device);
 	if (!device) {
+		debug("normal chcek mode return -1");
 		return -1;
 	}
 	idevice_free(device);
-
+	debug("normal chcek mode return 0");
 	return 0;
 }
 
 irecv_device_t normal_get_irecv_device(struct idevicerestore_client_t* client)
 {
+	debug("normal_get_irecv_device");
 	idevice_t device = NULL;
 	lockdownd_client_t lockdown = NULL;
 	lockdownd_error_t lockdown_error = LOCKDOWN_E_SUCCESS;
@@ -234,10 +238,10 @@ int normal_enter_recovery(struct idevicerestore_client_t* client)
 	}
 
 	/* unpair the device */
-	lockdown_error = lockdownd_unpair(lockdown, NULL);
-	if (lockdown_error != LOCKDOWN_E_SUCCESS) {
-		error("WARNING: Could not unpair device\n");
-	}
+	//lockdown_error = lockdownd_unpair(lockdown, NULL);
+	//if (lockdown_error != LOCKDOWN_E_SUCCESS) {
+	//	error("WARNING: Could not unpair device\n");
+	//}
 
 	lockdown_error = lockdownd_enter_recovery(lockdown);
 	if (lockdown_error == LOCKDOWN_E_SESSION_INACTIVE) {
@@ -263,8 +267,14 @@ int normal_enter_recovery(struct idevicerestore_client_t* client)
 	device = NULL;
 
 	mutex_lock(&client->device_event_mutex);
-	debug("DEBUG: Waiting for device to disconnect...\n");
+	debug("DEBUG: Waiting for device to disconnect...4\n");
 	cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 60000);
+	int tries = 3 ;
+	while(tries-- && (client->mode == MODE_NORMAL || (client->flags & FLAG_QUIT))) {
+		debug("cond_wait_timeout retry\n");
+		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+	}
+
 	if (client->mode == MODE_NORMAL || (client->flags & FLAG_QUIT)) {
 		mutex_unlock(&client->device_event_mutex);
 		error("ERROR: Failed to place device in recovery mode\n");
@@ -273,6 +283,13 @@ int normal_enter_recovery(struct idevicerestore_client_t* client)
 
 	debug("DEBUG: Waiting for device to connect in recovery mode...\n");
 	cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 60000);
+	tries = 3 ;
+	while(tries-- && (client->mode != MODE_RECOVERY || (client->flags & FLAG_QUIT))) {
+		debug("cond_wait_timeout retry\n");
+		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+	}
+
+
 	if (client->mode != MODE_RECOVERY || (client->flags & FLAG_QUIT)) {
 		mutex_unlock(&client->device_event_mutex);
 		error("ERROR: Failed to enter recovery mode\n");
