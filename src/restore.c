@@ -179,7 +179,7 @@ static int restore_idevice_new(struct idevicerestore_client_t* client, idevice_t
 		}
 		device_error = idevice_new(&dev, devices[j]);
 		if (device_error != IDEVICE_E_SUCCESS) {
-			debug("%s: 5 can't open device with UDID %s\n", __func__, devices[j]);
+			debug("%s: can't open device with UDID %s\n", __func__, devices[j]);
 			continue;
 		}
 
@@ -387,7 +387,7 @@ static int restore_is_current_device(struct idevicerestore_client_t* client, con
 
 	device_error = idevice_new(&device, udid);
 	if (device_error != IDEVICE_E_SUCCESS) {
-		debug("%s: 6 can't open device with UDID %s\n", __func__, udid);
+		debug("%s: can't open device with UDID %s\n", __func__, udid);
 		return 0;
 	}
 
@@ -707,7 +707,7 @@ int restore_handle_progress_msg(struct idevicerestore_client_t* client, plist_t 
 			break;
 		}
 	} else {
-		info("%s (%d) progress:%d\n", restore_progress_string(adapted_operation), (int)operation, (int) progress);
+		info("%s (%d)\n", restore_progress_string(adapted_operation), (int)operation);
 	}
 	lastop = (int)operation;
 
@@ -2863,10 +2863,10 @@ static plist_t restore_get_cryptex1_firmware_data(restored_client_t restore, str
 	plist_t p_updater_name = plist_dict_get_item(arguments, "MessageArgUpdaterName");
 	const char* s_updater_name = plist_get_string_ptr(p_updater_name, NULL);
 
-	plist_t device_generated_tags = plist_access_path(arguments, 2, "DeviceGeneratedTags", "ResponseTags");
+	plist_t response_tags = plist_access_path(arguments, 2, "DeviceGeneratedTags", "ResponseTags");
 	const char* response_ticket = "Cryptex1,Ticket";
-	if (PLIST_IS_ARRAY(device_generated_tags)) {
-		plist_t tag0 = plist_array_get_item(device_generated_tags, 0);
+	if (PLIST_IS_ARRAY(response_tags)) {
+		plist_t tag0 = plist_array_get_item(response_tags, 0);
 		if (tag0) {
 			response_ticket = plist_get_string_ptr(tag0, NULL);
 		}
@@ -2881,28 +2881,48 @@ static plist_t restore_get_cryptex1_firmware_data(restored_client_t restore, str
 
 	parameters = plist_new_dict();
 
-	/* add manifest for current build_identity to parameters (Cryptex1 will require the manifest in a seperate message) */
-	tss_parameters_add_from_manifest(parameters, build_identity, false);
+	/* merge data from MessageArgInfo */
+	plist_dict_merge(&parameters, p_info);
 
-	plist_dict_set_item(parameters, "ApProductionMode", plist_new_bool(1));
-	plist_dict_set_item(parameters, "ApSecurityMode", plist_new_bool(1));
+	/* add tags from manifest to parameters */
+	plist_t build_identity_tags = plist_access_path(arguments, 2, "DeviceGeneratedTags", "BuildIdentityTags");
+	if (PLIST_IS_ARRAY(build_identity_tags)) {
+		uint32_t i = 0;
+		for (i = 0; i < plist_array_get_size(build_identity_tags); i++) {
+			plist_t node = plist_array_get_item(build_identity_tags, i);
+			const char* key = plist_get_string_ptr(node, NULL);
+			plist_t item = plist_dict_get_item(build_identity, key);
+			if (item) {
+				plist_dict_set_item(parameters, key, plist_copy(item));
+			}
+		}
+	}
 
-	/* add tags from info dictionary to parameters */
+	/* make sure we always have these required tags defined */
+	if (!plist_dict_get_item(parameters, "ApProductionMode")) {
+		plist_dict_set_item(parameters, "ApProductionMode", plist_new_bool(1));
+	}
+	if (!plist_dict_get_item(parameters, "ApSecurityMode")) {
+		plist_dict_set_item(parameters, "ApSecurityMode", plist_new_bool(1));
+	}
+	if (!plist_dict_get_item(parameters, "ApChipID")) {
+		_plist_dict_copy_uint(parameters, build_identity, "ApChipID", NULL);
+	}
+	if (!plist_dict_get_item(parameters, "ApBoardID")) {
+		_plist_dict_copy_uint(parameters, build_identity, "ApBoardID", NULL);
+	}
+
+	/* add device generated request data to parameters */
 	plist_t device_generated_request = plist_dict_get_item(arguments, "DeviceGeneratedRequest");
 	if (!device_generated_request) {
 		error("ERROR: Could not find DeviceGeneratedRequest in arguments dictionary\n");
 		plist_free(parameters);
 		return NULL;
 	}
-
 	plist_dict_merge(&parameters, device_generated_request);
 
-	/* add common tags */
-	tss_request_add_common_tags(request, p_info, NULL);
-
-	/* add Cryptex1 tags */
-	plist_dict_set_item(request, "@BBTicket", plist_new_bool(1));
-	plist_dict_merge(&request, parameters);
+	/* add Cryptex1 tags to request */
+	tss_request_add_cryptex_tags(request, parameters, NULL);
 
 	plist_free(parameters);
 
@@ -4360,21 +4380,18 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 			//if (idevicerestore_debug)
 				debug_plist(message);
 		}
-		debug("free type");
+
 		free(type);
-		debug("fplist_free");
 		plist_free(message);
 		message = NULL;
 	}
 
 #ifdef HAVE_REVERSE_PROXY
-	debug("reverse_proxy_client_free");
 	reverse_proxy_client_free(rproxy);
 #else
 	if (thread_alive(fdr_thread)) {
 		if (fdr_control_channel) {
 			fdr_disconnect(fdr_control_channel);
-			debug("thread_join");
 			thread_join(fdr_thread);
 			fdr_control_channel = NULL;
 		}
