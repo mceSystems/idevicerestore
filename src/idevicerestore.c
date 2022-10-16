@@ -482,17 +482,39 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		if (dfu_client_new(client) < 0) {
 			return -1;
 		}
-		info("exploiting with limera1n...\n");
-		// TODO: check for non-limera1n device and fail
-		if (limera1n_exploit(client->device, &client->dfu->client) != 0) {
-			error("ERROR: limera1n exploit failed\n");
+
+		// Check if device is vulnerable to limera1n
+		unsigned int cpid = 0;
+		dfu_get_cpid(client, &cpid);
+
+		int limera1nDevices[] = {8920, 8922, 8930};
+		int limera1nDevicesLen = sizeof limera1nDevices / sizeof limera1nDevices[0];
+		int limera1nVuln = 0;
+
+		for (int i = 0; i < limera1nDevicesLen; i++) {
+			if (limera1nDevices[i] == cpid) {
+				limera1nVuln = 1;
+				break;
+			}
+		}
+
+		if (limera1nVuln == 1) {
+			info("exploiting with limera1n...\n");
+			if (limera1n_exploit(client->device, &client->dfu->client) != 0) {
+				error("ERROR: limera1n exploit failed\n");
+				dfu_client_free(client);
+				return -1;
+			}
 			dfu_client_free(client);
+			info("Device should be in pwned DFU state now.\n");
+
+			return 0;
+		}
+		else {
+			dfu_client_free(client);
+			error("ERROR: This device is not supported by the limera1n exploit");
 			return -1;
 		}
-		dfu_client_free(client);
-		info("Device should be in pwned DFU state now.\n");
-
-		return 0;
 	}
 
 	if (client->flags & FLAG_LATEST) {
@@ -1276,9 +1298,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			debug("cond_wait_timeout retry\n");
 			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
 		}
-		
-
-
 		if (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
 
@@ -1797,7 +1816,6 @@ int main(int argc, char* argv[]) {
 
 irecv_device_t get_irecv_device(struct idevicerestore_client_t *client)
 {
-	info("get_irecv_device");
 	int mode = _MODE_UNKNOWN;
 
 	if (client->mode) {
@@ -2297,7 +2315,7 @@ int get_recoveryos_root_ticket_tss_response(struct idevicerestore_client_t* clie
 	}
 
 	/* add common tags from manifest */
-	/* Adds Ap,OSLongVersion, AppNonce, @ApImg4Ticket */
+	/* Adds Ap,OSLongVersion, ApNonce, @ApImg4Ticket */
 	if (tss_request_add_ap_img4_tags(request, parameters) < 0) {
 		error("ERROR: Unable to add AP IMG4 tags to TSS request\n");
 		plist_free(request);
@@ -2585,9 +2603,9 @@ int personalize_component(const char *component_name, const unsigned char* compo
 	unsigned char* stitched_component = NULL;
 	unsigned int stitched_component_size = 0;
 
-	if (tss_response && tss_response_get_ap_img4_ticket(tss_response, &component_blob, &component_blob_size) == 0) {
+	if (tss_response && plist_dict_get_item(tss_response, "ApImg4Ticket")) {
 		/* stitch ApImg4Ticket into IMG4 file */
-		img4_stitch_component(component_name, component_data, component_size, component_blob, component_blob_size, &stitched_component, &stitched_component_size);
+		img4_stitch_component(component_name, component_data, component_size, tss_response, &stitched_component, &stitched_component_size);
 	} else {
 		/* try to get blob for current component from tss response */
 		if (tss_response && tss_response_get_blob_by_entry(tss_response, component_name, &component_blob) < 0) {
@@ -2609,7 +2627,6 @@ int personalize_component(const char *component_name, const unsigned char* compo
 			}
 		}
 	}
-	debug("personalize_component free blob");
 	free(component_blob);
 
 	if (idevicerestore_keep_pers) {
@@ -2618,7 +2635,6 @@ int personalize_component(const char *component_name, const unsigned char* compo
 
 	*personalized_component = stitched_component;
 	*personalized_component_size = stitched_component_size;
-	debug("personalize_component return 0");
 	return 0;
 }
 
