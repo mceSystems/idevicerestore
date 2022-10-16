@@ -65,7 +65,6 @@ plist_t tss_request_new(plist_t overrides)
 {
 	plist_t request = plist_new_dict();
 
-	plist_dict_set_item(request, "@BBTicket", plist_new_bool(1));
 	plist_dict_set_item(request, "@HostPlatformInfo",
 #ifdef WIN32
 		plist_new_string("windows")
@@ -216,7 +215,7 @@ int tss_parameters_add_from_manifest(plist_t parameters, plist_t build_identity,
 	_plist_dict_copy_uint(parameters, build_identity, "Baobab,SecurityDomain", NULL);
 
 	_plist_dict_copy_uint(parameters, build_identity, "eUICC,ChipID", NULL);
-
+	_plist_dict_copy_uint(parameters, build_identity, "NeRDEpoch", NULL);
 	_plist_dict_copy_data(parameters, build_identity, "PearlCertificationRootPub", NULL);
 
 	_plist_dict_copy_uint(parameters, build_identity, "Timer,BoardID,1", NULL);
@@ -290,6 +289,7 @@ int tss_request_add_ap_img4_tags(plist_t request, plist_t parameters)
 	}
 
 	_plist_dict_copy_data(request, parameters, "SepNonce", "ApSepNonce");
+	_plist_dict_copy_uint(request, parameters, "NeRDEpoch", NULL);
 	_plist_dict_copy_data(request, parameters, "PearlCertificationRootPub", NULL);
 
 	return 0;

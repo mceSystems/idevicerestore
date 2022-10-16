@@ -4281,9 +4281,9 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 			message = NULL;
 			continue;
 		} else if (restore_error != RESTORE_E_SUCCESS) {
-			error("ERROR: Could not read data (%d). Aborting.\n", restore_error);
-			err = -11;
-			break;
+			debug("No data to read\n");
+			message = NULL;
+			continue;
 		}
 #else
 		if (restore_error != RESTORE_E_SUCCESS) {
