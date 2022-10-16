@@ -218,14 +218,13 @@ int recovery_enter_restore(struct idevicerestore_client_t* client, plist_t build
 		return -1;
 	}
 
-	debug("DEBUG: Waiting for device to disconnect...5\n");
+	debug("DEBUG: Waiting for device to disconnect... 5 \n");
 	cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 30000);
 	int tries = 3 ;
 	while(tries-- && (client->mode == MODE_RECOVERY || (client->flags & FLAG_QUIT))) {
 		debug("cond_wait_timeout retry\n");
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
 	}
-
 	if (client->mode == MODE_RECOVERY || (client->flags & FLAG_QUIT)) {
 		mutex_unlock(&client->device_event_mutex);
 		error("ERROR: Failed to place device in restore mode\n");
@@ -350,7 +349,7 @@ int recovery_send_ibec(struct idevicerestore_client_t* client, plist_t build_ide
 		return -1;
 	}
 
-	recovery_error = irecv_send_command(client->recovery->client, "go");
+	recovery_error = irecv_send_command_breq(client->recovery->client, "go", 1);
 	if (recovery_error != IRECV_E_SUCCESS) {
 		error("ERROR: Unable to execute %s\n", component);
 		return -1;
@@ -504,7 +503,7 @@ int recovery_send_kernelcache(struct idevicerestore_client_t* client, plist_t bu
 		recovery_error = irecv_send_command(client->recovery->client, setba);
 	}
 
-	recovery_error = irecv_send_command(client->recovery->client, "bootx");
+	recovery_error = irecv_send_command_breq(client->recovery->client, "bootx", 1);
 	if (recovery_error != IRECV_E_SUCCESS) {
 		error("ERROR: Unable to execute %s\n", component);
 		return -1;
@@ -581,6 +580,6 @@ int recovery_get_sep_nonce(struct idevicerestore_client_t* client, unsigned char
 
 int recovery_send_reset(struct idevicerestore_client_t* client)
 {
-	irecv_send_command(client->recovery->client, "reset");
+	irecv_send_command_breq(client->recovery->client, "reset", 1);
 	return 0;
 }
