@@ -4248,9 +4248,9 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 			message = NULL;
 			continue;
 		} else if (restore_error != RESTORE_E_SUCCESS) {
-			error("ERROR: Could not read data (%d). Aborting.\n", restore_error);
-			err = -11;
-			break;
+			debug("No data to read\n");
+			message = NULL;
+			continue;
 		}
 #else
 		if (restore_error != RESTORE_E_SUCCESS) {
@@ -4272,6 +4272,7 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 		}
 		plist_get_string_val(node, &type);
 
+		debug("got message %s",type);
 		// data request messages are sent by restored whenever it requires
 		// files sent to the server by the client. these data requests include
 		// SystemImageData, RootTicket, KernelCache, NORData and BasebandData requests
@@ -4352,7 +4353,7 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 		plist_free(message);
 		message = NULL;
 	}
-
+	debug("RESTORE DEVICE DONE !!!\n");
 #ifdef HAVE_REVERSE_PROXY
 	reverse_proxy_client_free(rproxy);
 #else
@@ -4365,6 +4366,6 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 	}
 #endif
 
-	restore_client_free(client);
+	//restore_client_free(client);
 	return err;
 }
