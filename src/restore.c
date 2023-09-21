@@ -4086,7 +4086,7 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 		// FIXME: We might want to return failure here as it will likely fail
 	}
 #endif
-
+	info("AutoBootDelay\n");
 	plist_t opts = plist_new_dict();
 	// FIXME: required?
 	//plist_dict_set_item(opts, "AuthInstallRestoreBehavior", plist_new_string("Erase"));
@@ -4191,7 +4191,7 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 		/* this is mandatory on iOS 7+ to allow restore from normal mode */
 		plist_dict_set_item(opts, "PersonalizedDuringPreflight", plist_new_bool(1));
 	}
-
+	info("RootToInstall\n");
 	plist_dict_set_item(opts, "RootToInstall", plist_new_bool(0));
 	char* guid = generate_guid();
 	if (guid) {
@@ -4226,7 +4226,7 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 	}
 	plist_free(opts);
 	idevicerestore_progress(client, RESTORE_STEP_PREPARE, 1.0);
-
+	info("going into while\n");
 	// this is the restore process loop, it reads each message in from
 	// restored and passes that data on to it's specific handler
 	while (!(client->flags & FLAG_QUIT)) {
@@ -4272,7 +4272,7 @@ int restore_device(struct idevicerestore_client_t* client, plist_t build_identit
 		}
 		plist_get_string_val(node, &type);
 
-		debug("got message %s",type);
+		info("got message %s\n",type);
 		// data request messages are sent by restored whenever it requires
 		// files sent to the server by the client. these data requests include
 		// SystemImageData, RootTicket, KernelCache, NORData and BasebandData requests

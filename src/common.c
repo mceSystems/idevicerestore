@@ -98,6 +98,7 @@ void error(const char* format, ...)
 		vfprintf((error_stream) ? error_stream : stderr, format, vargs2);
 	}
 	va_end(vargs2);
+	fflush(stderr);
 }
 
 void debug(const char* format, ...)
@@ -110,6 +111,7 @@ void debug(const char* format, ...)
 	va_start(vargs, format);
 	vfprintf((debug_stream) ? debug_stream : stderr, format, vargs);
 	va_end(vargs);
+	fflush(stderr);
 }
 
 void idevicerestore_set_info_stream(FILE* strm)

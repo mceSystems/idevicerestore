@@ -426,7 +426,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 
 			ipsw_extract_to_memory(wtfipsw, wtfname, &wtftmp, &wtfsize);
 			if (!wtftmp) {
-				error("ERROR: Could not extract WTF\n");
+				error("ERROR: Could not extract \n");
 			}
 		}
 
@@ -1610,9 +1610,11 @@ void plain_progress_cb(int step, double step_progress, void* userdata)
 {
 	printf("progress: %u %f\n", step, step_progress);
 	fflush(stdout);
+	fflush(stderr);
 }
 
 int main(int argc, char* argv[]) {
+	setbuf(stdout, NULL);
 	int opt = 0;
 	int optindex = 0;
 	char* ipsw = NULL;
@@ -1749,7 +1751,7 @@ int main(int argc, char* argv[]) {
 			}
 			client->root_ticket = root_ticket;
 			client->root_ticket_len = (int)root_ticket_len;
-			info("Using ApTicket found at %s length %u\n", optarg, client->root_ticket_len);
+			info("Using  ApTicket found at %s length %u\n", optarg, client->root_ticket_len);
 			break;
 		}
 
