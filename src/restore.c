@@ -742,6 +742,7 @@ int restore_handle_status_msg(restored_client_t client, plist_t msg)
 		case 27:
 			info("Status: Failed to mount filesystems.\n");
 			break;
+		case 50:
 		case 51:
 			info("Status: Failed to load SEP Firmware.\n");
 			break;
@@ -1378,7 +1379,30 @@ int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* 
 		personalized_data = NULL;
 		personalized_size = 0;
 	}
+	if (build_identity_has_component(build_identity, "SepStage1") &&
+	    build_identity_get_component_path(build_identity, "SepStage1", &sep_path) == 0) {
+		component = "SepStage1";
+		ret = extract_component(client->ipsw, sep_path, &component_data, &component_size);
+		free(sep_path);
+		if (ret < 0) {
+			error("ERROR: Unable to extract component: %s\n", component);
+			return -1;
+		}
 
+		ret = personalize_component(component, component_data, component_size, client->tss, &personalized_data, &personalized_size);
+		free(component_data);
+		component_data = NULL;
+		component_size = 0;
+		if (ret < 0) {
+			error("ERROR: Unable to get personalized component: %s\n", component);
+			return -1;
+		}
+
+		plist_dict_set_item(dict, "SEPPatchImageData", plist_new_data((char*)personalized_data, (uint64_t) personalized_size));
+		free(personalized_data);
+		personalized_data = NULL;
+		personalized_size = 0;
+	}
 	if (idevicerestore_debug)
 		debug_plist(dict);
 
@@ -2105,7 +2129,7 @@ static int restore_send_image_data(restored_client_t restore, struct idevicerest
 	return 0;
 }
 
-static plist_t restore_get_se_firmware_data(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity, plist_t p_info)
+static plist_t restore_get_se_firmware_data(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity, plist_t p_info, plist_t arguments)
 {
 	const char *comp_name = NULL;
 	char *comp_path = NULL;
@@ -2114,6 +2138,7 @@ static plist_t restore_get_se_firmware_data(restored_client_t restore, struct id
 	plist_t parameters = NULL;
 	plist_t request = NULL;
 	plist_t response = NULL;
+	plist_t p_dgr = NULL;
 	int ret;
 	uint64_t chip_id = 0;
 	plist_t node = plist_dict_get_item(p_info, "SE,ChipID");
@@ -2122,7 +2147,7 @@ static plist_t restore_get_se_firmware_data(restored_client_t restore, struct id
 	}
 	if (chip_id == 0x20211) {
 		comp_name = "SE,Firmware";
-	} else if (chip_id == 0x73 || chip_id == 0x64 || chip_id == 0xC8 || chip_id == 0xD2) {
+	} else if (chip_id == 0x73 || chip_id == 0x64 || chip_id == 0xC8 || chip_id == 0xD2 || chip_id == 0x2C) {
 		comp_name = "SE,UpdatePayload";
 	} else {
 		info("WARNING: Unknown SE,ChipID 0x%" PRIx64 " detected. Restore might fail.\n", (uint64_t)chip_id);
@@ -2135,6 +2160,13 @@ static plist_t restore_get_se_firmware_data(restored_client_t restore, struct id
 			return NULL;
 		}
 		debug("DEBUG: %s: using %s\n", __func__, comp_name);
+	}
+	p_dgr = plist_dict_get_item(arguments, "DeviceGeneratedRequest");
+	if (!p_dgr) {
+		info("NOTE: %s: No DeviceGeneratedRequest in firmware updater data request. Continuing anyway.\n", __func__);
+	} else if (!PLIST_IS_DICT(p_dgr)) {
+		error("ERROR: %s: DeviceGeneratedRequest has invalid type!\n", __func__);
+		return NULL;
 	}
 
 	if (build_identity_get_component_path(build_identity, comp_name, &comp_path) < 0) {
@@ -2167,7 +2199,7 @@ static plist_t restore_get_se_firmware_data(restored_client_t restore, struct id
 	plist_dict_merge(&parameters, p_info);
 
 	/* add required tags for SE TSS request */
-	tss_request_add_se_tags(request, parameters, NULL);
+	tss_request_add_se_tags(request, parameters, p_dgr);
 
 	plist_free(parameters);
 
@@ -2180,10 +2212,12 @@ static plist_t restore_get_se_firmware_data(restored_client_t restore, struct id
 		return NULL;
 	}
 
-	if (plist_dict_get_item(response, "SE,Ticket")) {
-		info("Received SE ticket\n");
+	if (plist_dict_get_item(response, "SE2,Ticket")) {
+		info("Received SE2,Ticket\n");
+	} else if (plist_dict_get_item(response, "SE,Ticket")) {
+		info("Received SE,Ticket\n");
 	} else {
-		error("ERROR: No 'SE,Ticket' in TSS response, this might not work\n");
+		error("ERROR: No 'SE ticket' in TSS response, this might not work\n");
 	}
 
 	plist_dict_set_item(response, "FirmwareData", plist_new_data((char*)component_data, (uint64_t) component_size));
@@ -2369,7 +2403,7 @@ static plist_t restore_get_yonkers_firmware_data(restored_client_t restore, stru
 	return response;
 }
 
-static plist_t restore_get_rose_firmware_data(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity, plist_t p_info)
+static plist_t restore_get_rose_firmware_data(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity, plist_t p_info, plist_t arguments)
 {
 	char *comp_name = NULL;
 	char *comp_path = NULL;
@@ -2404,8 +2438,14 @@ static plist_t restore_get_rose_firmware_data(restored_client_t restore, struct 
 		plist_dict_set_item(parameters, "ApSupportsImg4", plist_new_bool(0));
 	}
 
-	/* add Rap,* tags from info dictionary to parameters */
-	plist_dict_merge(&parameters, p_info);
+	plist_t device_generated_request = plist_dict_get_item(arguments, "DeviceGeneratedRequest");
+	if (device_generated_request) {
+		/* use DeviceGeneratedRequest if present */
+		plist_dict_merge(&request, device_generated_request);
+	} else {
+		/* add Rap,* tags from info dictionary to parameters */
+		plist_dict_merge(&parameters, p_info);
+	}
 
 	/* add required tags for Rose TSS request */
 	tss_request_add_rose_tags(request, parameters, NULL);
@@ -2426,7 +2466,11 @@ static plist_t restore_get_rose_firmware_data(restored_client_t restore, struct 
 	} else {
 		error("ERROR: No 'Rap,Ticket' in TSS response, this might not work\n");
 	}
-
+	/* skip FirmwareData for newer versions */
+	if (client->build_major >= 20) {
+		debug("DEBUG: Not adding FirmwareData.\n");
+		return response;
+	}
 	comp_name = "Rap,RTKitOS";
 	if (build_identity_get_component_path(build_identity, comp_name, &comp_path) < 0) {
 		error("ERROR: Unable to get path for '%s' component\n", comp_name);
@@ -2599,7 +2643,60 @@ static plist_t restore_get_veridian_firmware_data(restored_client_t restore, str
 
 	return response;
 }
+static plist_t restore_get_generic_firmware_data(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity, plist_t p_info, plist_t arguments)
+{
+	plist_t request = NULL;
+	plist_t response = NULL;
 
+	plist_t p_updater_name = plist_dict_get_item(arguments, "MessageArgUpdaterName");
+	const char* s_updater_name = plist_get_string_ptr(p_updater_name, NULL);
+
+	plist_t response_tags = plist_access_path(arguments, 2, "DeviceGeneratedTags", "ResponseTags");
+	const char* response_ticket = NULL;
+	if (PLIST_IS_ARRAY(response_tags)) {
+		plist_t tag0 = plist_array_get_item(response_tags, 0);
+		if (tag0) {
+			response_ticket = plist_get_string_ptr(tag0, NULL);
+		}
+	}
+	if (response_ticket == NULL) {
+		error("ERROR: Unable to determine response ticket from device generated tags");
+		return NULL;
+	}
+
+	/* create TSS request */
+	request = tss_request_new(NULL);
+	if (request == NULL) {
+		error("ERROR: Unable to create %s TSS request\n", s_updater_name);
+		return NULL;
+	}
+
+	/* add device generated request data to request */
+	plist_t device_generated_request = plist_dict_get_item(arguments, "DeviceGeneratedRequest");
+	if (!device_generated_request) {
+		error("ERROR: Could not find DeviceGeneratedRequest in arguments dictionary\n");
+		plist_free(request);
+		return NULL;
+	}
+	plist_dict_merge(&request, device_generated_request);
+
+	info("Sending %s TSS request...\n", s_updater_name);
+	response = tss_request_send(request, client->tss_url);
+	plist_free(request);
+	if (response == NULL) {
+		error("ERROR: Unable to fetch %s ticket\n", s_updater_name);
+		return NULL;
+	}
+
+	if (plist_dict_get_item(response, response_ticket)) {
+		info("Received %s\n", response_ticket);
+	} else {
+		error("ERROR: No '%s' in TSS response, this might not work\n", response_ticket);
+		debug_plist(response);
+	}
+
+	return response;
+}
 static plist_t restore_get_tcon_firmware_data(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity, plist_t p_info)
 {
 	char *comp_name = "Baobab,TCON";
@@ -3025,7 +3122,7 @@ static int restore_send_firmware_updater_data(restored_client_t restore, struct 
 	plist_get_string_val(p_updater_name, &s_updater_name);
 
 	if (strcmp(s_updater_name, "SE") == 0) {
-		fwdict = restore_get_se_firmware_data(restore, client, build_identity, p_info);
+		fwdict = restore_get_se_firmware_data(restore, client, build_identity, p_info, arguments);
 		if (fwdict == NULL) {
 			error("ERROR: %s: Couldn't get SE firmware data\n", __func__);
 			goto error_out;
@@ -3044,7 +3141,7 @@ static int restore_send_firmware_updater_data(restored_client_t restore, struct 
 			goto error_out;
 		}
 	} else if (strcmp(s_updater_name, "Rose") == 0) {
-		fwdict = restore_get_rose_firmware_data(restore, client, build_identity, p_info);
+		fwdict = restore_get_rose_firmware_data(restore, client, build_identity, p_info, arguments);
 		if (fwdict == NULL) {
 			error("ERROR: %s: Couldn't get Rose firmware data\n", __func__);
 			goto error_out;
@@ -3061,6 +3158,12 @@ static int restore_send_firmware_updater_data(restored_client_t restore, struct 
 			error("ERROR: %s: Couldn't get AppleTCON firmware data\n", __func__);
 			goto error_out;
 		}
+	} else if (strcmp(s_updater_name, "PS190") == 0) {
+		fwdict = restore_get_generic_firmware_data(restore, client, build_identity, p_info, arguments);
+		if (fwdict == NULL) {
+			error("ERROR: %s: Couldn't get PCON1 firmware data\n", __func__);
+			goto error_out;
+		}
 	} else if (strcmp(s_updater_name, "AppleTypeCRetimer") == 0) {
 		fwdict = restore_get_timer_firmware_data(restore, client, build_identity, p_info);
 		if (fwdict == NULL) {
@@ -3074,8 +3177,12 @@ static int restore_send_firmware_updater_data(restored_client_t restore, struct 
 			goto error_out;
 		}
 	} else {
-		error("ERROR: %s: Got unknown updater name '%s'.\n", __func__, s_updater_name);
-		goto error_out;
+		error("ERROR: %s: Got unknown updater name '%s', trying to discover from device generated request.\n", __func__, s_updater_name);
+		fwdict = restore_get_generic_firmware_data(restore, client, build_identity, p_info, arguments);
+		if (fwdict == NULL) {
+			error("ERROR: %s: Couldn't get %s firmware data\n", __func__, s_updater_name);
+			goto error_out;
+		}
 	}
 	free(s_updater_name);
 	s_updater_name = NULL;

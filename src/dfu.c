@@ -350,11 +350,13 @@ int dfu_send_iboot_stage1_components(struct idevicerestore_client_t* client, pli
 			uint8_t b = 0;
 			plist_get_bool_val(iboot_node, &b);
 			if (b) {
-				debug("DEBUG: %s is loaded by iBoot Stage 1.\n", key);
-				if (dfu_send_component_and_command(client, build_identity, key, "firmware") < 0) {
-					error("ERROR: Unable to send component '%s' to device.\n", key);
-					err++;
-				}
+				debug("DEBUG: %s is loaded by iBoot Stage 1 and iBoot.\n", key);
+			} else {
+				debug("DEBUG: %s is loaded by iBoot Stage 1 but not iBoot...\n", key);
+			}
+			if (dfu_send_component_and_command(client, build_identity, key, "firmware") < 0) {
+				error("ERROR: Unable to send component '%s' to device.\n", key);
+				err++;
 			}
 		}
 		free(key);
@@ -481,7 +483,20 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 				client->dfu->client = NULL;
 				return -1;
 			}
-
+			char *value = NULL;
+			unsigned long boot_stage = 0;
+			irecv_getenv(client->dfu->client, "boot-stage", &value);
+			if (value) {
+				boot_stage = strtoul(value, NULL, 0);
+			}
+			if (boot_stage > 0) {
+				info("iBoot boot-stage=%s\n", value);
+				free(value);
+				value = NULL;
+				if (boot_stage != 1) {
+					error("ERROR: iBoot should be at boot stage 1, continuing anyway...\n");
+				}
+			}
 			if (dfu_send_iboot_stage1_components(client, build_identity) < 0) {
 				mutex_unlock(&client->device_event_mutex);
 				error("ERROR: Unable to send iBoot stage 1 components to device\n");
