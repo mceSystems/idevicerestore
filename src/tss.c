@@ -1663,6 +1663,7 @@ int tss_response_get_baseband_ticket(plist_t response, unsigned char** ticket, u
 
 int tss_response_get_path_by_entry(plist_t response, const char* entry, char** path)
 {
+	debug("tss_response_get_path_by_entry %s %s ",entry ? entry : "null",path ? path : "null");
 	char* path_string = NULL;
 	plist_t path_node = NULL;
 	plist_t entry_node = NULL;

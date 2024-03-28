@@ -284,7 +284,7 @@ int recovery_send_component(struct idevicerestore_client_t* client, plist_t buil
 	unsigned char* data = NULL;
 	char* path = NULL;
 	irecv_error_t err = 0;
-
+	debug("recovery_send_component");
 	if (client->tss) {
 		if (tss_response_get_path_by_entry(client->tss, component, &path) < 0) {
 			debug("NOTE: No path for component %s in TSS, will fetch from build_identity\n", component);

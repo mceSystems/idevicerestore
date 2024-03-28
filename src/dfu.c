@@ -121,7 +121,7 @@ int dfu_send_buffer(struct idevicerestore_client_t* client, unsigned char* buffe
 int dfu_send_component(struct idevicerestore_client_t* client, plist_t build_identity, const char* component)
 {
 	char* path = NULL;
-
+	debug("dfu_send_component");
 	// Use a specific TSS ticket for the Ap,LocalPolicy component
 	plist_t tss = client->tss;
 	if (strcmp(component, "Ap,LocalPolicy") == 0) {

@@ -219,17 +219,18 @@ irecv_device_t normal_get_irecv_device(struct idevicerestore_client_t* client)
 
 int normal_enter_recovery(struct idevicerestore_client_t* client)
 {
+	printf("0\n");
 	idevice_t device = NULL;
 	lockdownd_client_t lockdown = NULL;
 	idevice_error_t device_error = IDEVICE_E_SUCCESS;
 	lockdownd_error_t lockdown_error = LOCKDOWN_E_SUCCESS;
-
+	error("1");
 	device_error = idevice_new(&device, client->udid);
 	if (device_error != IDEVICE_E_SUCCESS) {
 		error("ERROR: Unable to find device\n");
 		return -1;
 	}
-
+	error("2");
 	lockdown_error = lockdownd_client_new(device, &lockdown, "idevicerestore");
 	if (lockdown_error != LOCKDOWN_E_SUCCESS) {
 		error("ERROR: Unable to connect to lockdownd: %s (%d)\n", lockdownd_strerror(lockdown_error), lockdown_error);
@@ -242,7 +243,7 @@ int normal_enter_recovery(struct idevicerestore_client_t* client)
 	//if (lockdown_error != LOCKDOWN_E_SUCCESS) {
 	//	error("WARNING: Could not unpair device\n");
 	//}
-
+	error("3");
 	lockdown_error = lockdownd_enter_recovery(lockdown);
 	if (lockdown_error == LOCKDOWN_E_SESSION_INACTIVE) {
 		lockdownd_client_free(lockdown);
@@ -254,19 +255,23 @@ int normal_enter_recovery(struct idevicerestore_client_t* client)
 		}
 		lockdown_error = lockdownd_enter_recovery(lockdown);
 	}
+	error("5");
 	if (lockdown_error != LOCKDOWN_E_SUCCESS) {
 		error("ERROR: Unable to place device in recovery mode: %s (%d)\n", lockdownd_strerror(lockdown_error), lockdown_error);
 		lockdownd_client_free(lockdown);
 		idevice_free(device);
 		return -1;
 	}
-
-	lockdownd_client_free(lockdown);
-	idevice_free(device);
+	error("lockdownd_client_free");
+	//lockdownd_client_free(lockdown);
+	error("idevice_free");
+	//idevice_free(device);
+	error("7");
 	lockdown = NULL;
 	device = NULL;
-
+	error("mutex_lock");
 	mutex_lock(&client->device_event_mutex);
+	error("Waiting");
 	debug("DEBUG: Waiting for device to disconnect...4\n");
 	cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 60000);
 	int tries = 3 ;
@@ -301,7 +306,7 @@ int normal_enter_recovery(struct idevicerestore_client_t* client)
 		error("ERROR: Unable to enter recovery mode\n");
 		return -1;
 	}
-
+	error("7");
 	return 0;
 }
 

@@ -45,6 +45,7 @@
 #define SHA384 sha384
 #endif
 
+#include "ace3.h"
 #include "dfu.h"
 #include "tss.h"
 #include "img3.h"
@@ -1218,7 +1219,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 
 	// if the device is in normal mode, place device into recovery mode
 	if (client->mode == MODE_NORMAL) {
-		info("Entering recovery mode...\n");
+		info("Entering recovery mode...  WELL\n");
 		if (normal_enter_recovery(client) < 0) {
 			error("ERROR: Unable to place device into recovery mode from normal mode\n");
 			if (client->tss)

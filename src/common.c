@@ -80,33 +80,28 @@ static int debug_disabled = 0;
 
 void info(const char* format, ...)
 {
-	if (info_disabled) return;
+	
 	va_list vargs;
 	va_start(vargs, format);
-	vfprintf((info_stream) ? info_stream : stdout, format, vargs);
+	vfprintf((debug_stream) ? debug_stream : stderr, format, vargs);
 	va_end(vargs);
+	fflush(stderr);
 }
 
 void error(const char* format, ...)
 {
-	va_list vargs, vargs2;
+
+	printf("format format:%s\n",format);
+	va_list vargs;
 	va_start(vargs, format);
-	va_copy(vargs2, vargs);
-	vsnprintf(idevicerestore_err_buff, idevicerestore_err_buff_size, format, vargs);
+	vfprintf((debug_stream) ? debug_stream : stderr, format, vargs);
 	va_end(vargs);
-	if (!error_disabled) {
-		vfprintf((error_stream) ? error_stream : stderr, format, vargs2);
-	}
-	va_end(vargs2);
 	fflush(stderr);
 }
 
 void debug(const char* format, ...)
 {
-	if (debug_disabled) return;
-	if (!idevicerestore_debug) {
-		return;
-	}
+	
 	va_list vargs;
 	va_start(vargs, format);
 	vfprintf((debug_stream) ? debug_stream : stderr, format, vargs);

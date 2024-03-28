@@ -1048,7 +1048,7 @@ int restore_send_component(restored_client_t restore, struct idevicerestore_clie
 	plist_t blob = NULL;
 	plist_t dict = NULL;
 	restored_error_t restore_error = RESTORE_E_SUCCESS;
-
+	debug("recovery_send_component 2");
 	if (component_name == NULL) {
 		component_name = component;
 	}
@@ -1061,6 +1061,7 @@ int restore_send_component(restored_client_t restore, struct idevicerestore_clie
 		}
 	}
 	if (!path) {
+		debug("no Path");
 		if (build_identity_get_component_path(build_identity, component, &path) < 0) {
 			error("ERROR: Unable to find %s path from build identity\n", component);
 			return -1;
@@ -1069,6 +1070,7 @@ int restore_send_component(restored_client_t restore, struct idevicerestore_clie
 
 	unsigned char* component_data = NULL;
 	unsigned int component_size = 0;
+	debug("extract_component");
 	int ret = extract_component(client->ipsw, path, &component_data, &component_size);
 	free(path);
 	path = NULL;
@@ -1123,14 +1125,14 @@ int restore_send_nor(restored_client_t restore, struct idevicerestore_client_t* 
 	plist_t norimage = NULL;
 	plist_t firmware_files = NULL;
 	int flash_version_1 = 0;
-
+	debug("restore_send_nor");
 	info("About to send NORData...\n");
 
 	plist_t arguments = plist_dict_get_item(message, "Arguments");
 	if (arguments && plist_get_node_type(arguments) == PLIST_DICT) {
 		flash_version_1 = plist_dict_get_item(arguments, "FlashVersion1") ? 1 : 0;
 	}
-
+	
 	if (client->tss) {
 		if (tss_response_get_path_by_entry(client->tss, "LLB", &llb_path) < 0) {
 			debug("NOTE: Could not get LLB path from TSS data, will fetch from build identity\n");
@@ -3533,7 +3535,7 @@ int restore_send_personalized_boot_object_v3(restored_client_t restore, struct i
 	plist_t dict = NULL;
 	restored_error_t restore_error = RESTORE_E_SUCCESS;
 
-	info("About to send %s...\n", component);
+	info("boot_object_v3 About to send %s...\n", component);
 
 	if (strcmp(image_name, "__GlobalManifest__") == 0) {
 		int ret = extract_global_manifest(client, build_identity, NULL, &data, &size);
@@ -3614,6 +3616,7 @@ int restore_send_personalized_boot_object_v3(restored_client_t restore, struct i
 
 int restore_send_source_boot_object_v4(restored_client_t restore, struct idevicerestore_client_t* client, plist_t msg, plist_t build_identity)
 {
+	debug("restore_send_source_boot_object_v4");
 	debug_plist(msg);
 
 	char *image_name = NULL;
@@ -3638,7 +3641,7 @@ int restore_send_source_boot_object_v4(restored_client_t restore, struct idevice
 	plist_t dict = NULL;
 	restored_error_t restore_error = RESTORE_E_SUCCESS;
 
-	info("About to send %s...\n", component);
+	info("ource_boot_object_v4 About to send %s...\n", component);
 
 	if (strcmp(image_name, "__GlobalManifest__") == 0) {
 		char *variant = NULL;
@@ -3679,7 +3682,7 @@ int restore_send_source_boot_object_v4(restored_client_t restore, struct idevice
 		return -1;
 	}
 
-	info("Sending %s now...\n", component);
+	info("Sending %s now... path:%s\n", component,path ? path : "null");
 
 	if (ipsw_extract_send(client->ipsw, path, 8192, (ipsw_send_cb)_restore_send_file_data, restore) < 0) {
 		free(path);
