@@ -22,8 +22,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <libimobiledevice-glue/nskeyedarchive.h>
-
+//#include <libimobiledevice-glue/nskeyedarchive.h>
+#include "nskeyedarchive.h"
 #include "common.h"
 #include "ace3.h"
 #include "endianness.h"
