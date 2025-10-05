@@ -247,7 +247,7 @@ int recovery_enter_restore(struct idevicerestore_client_t* client, plist_t build
 	}	
 	if (client->mode == MODE_RECOVERY || (client->flags & FLAG_QUIT)) {
 		mutex_unlock(&client->device_event_mutex);
-		error("ERROR: Failed to place device in restore mode\n");
+		logger(LL_ERROR," Failed to place device in restore mode\n");
 		return -1;
 	}
 	mutex_unlock(&client->device_event_mutex);

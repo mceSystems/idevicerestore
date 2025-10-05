@@ -55,7 +55,9 @@
 #include "recovery.h"
 #include "idevicerestore.h"
 
+#ifdef HAVE_LIMERA1N
 #include "limera1n.h"
+#endif
 
 #include "locking.h"
 
@@ -74,7 +76,9 @@ static struct option longopts[] = {
 	{ "exclude",        no_argument,       NULL, 'x' },
 	{ "shsh",           no_argument,       NULL, 't' },
 	{ "keep-pers",      no_argument,       NULL, 'k' },
+#ifdef HAVE_LIMERA1N
 	{ "pwn",            no_argument,       NULL, 'p' },
+#endif
 	{ "no-action",      no_argument,       NULL, 'n' },
 	{ "cache-path",     required_argument, NULL, 'C' },
 	{ "no-input",       no_argument,       NULL, 'y' },
@@ -93,6 +97,11 @@ static struct option longopts[] = {
 
 static void usage(int argc, char* argv[], int err)
 {
+#ifdef HAVE_LIMERA1N
+#define PWN_FLAG_LINE "  -p, --pwn             Put device in pwned DFU mode and exit (limera1n devices)\n"
+#else
+#define PWN_FLAG_LINE ""
+#endif
 	char* name = strrchr(argv[0], '/');
 	fprintf((err) ? stderr : stdout,
 	"Usage: %s [OPTIONS] PATH\n" \
@@ -139,11 +148,10 @@ static void usage(int argc, char* argv[], int err)
 	"  -t, --shsh            Fetch TSS record and save to .shsh file, then exit\n" \
 	"  -z, --no-restore      Do not restore and end after booting to the ramdisk\n" \
 	"  -k, --keep-pers       Write personalized components to files for debugging\n" \
-	"  -p, --pwn             Put device in pwned DFU mode and exit (limera1n devices)\n" \
+	PWN_FLAG_LINE \
 	"  -P, --plain-progress  Print progress as plain step and progress\n" \
 	"  -R, --restore-mode    Allow restoring from Restore mode\n" \
-	"  -F, --force-recovery  Force device into recovery mode before restore if needed\n" \
-	"                        Useful for devices that require starting restore from recovery mode\n" \
+	"  -F, --force-recovery  Force device into recovery before restore\n" \
 	"  -T, --ticket PATH     Use file at PATH to send as AP ticket\n" \
 	"  --variant VARIANT     Use given VARIANT to match the build identity to use,\n" \
         "                        e.g. 'Customer Erase Install (IPSW)'\n" \
@@ -248,25 +256,22 @@ static int compare_versions(const char *s_ver1, const char *s_ver2)
 
 static void idevice_event_cb(const idevice_event_t *event, void *userdata)
 {
-	logger(LL_INFO,"idevice_event_cb\n");
-	logger(LL_INFO,"idevice_event_cb: conn_type %d\n",event->conn_type);
+	logger(LL_DEBUG,"idevice_event_cb\n");
+	logger(LL_DEBUG,"idevice_event_cb: conn_type %d\n",event->conn_type);
 	struct idevicerestore_client_t *client = (struct idevicerestore_client_t*)userdata;
 #ifdef HAVE_ENUM_IDEVICE_CONNECTION_TYPE
 	if (event->conn_type != CONNECTION_USBMUXD) {
-		
-		logger(LL_INFO,"idevice_event_cb: event->conn_type != CONNECTION_USBMUXD\n");
-		logger(LL_INFO,"idevice_event_cb: event->conn_type = %d\n", event->conn_type);
 		// ignore everything but devices connected through USB
+		logger(LL_DEBUG,"idevice_event_cb: event->conn_type != CONNECTION_USBMUXD\n");
+		logger(LL_DEBUG,"idevice_event_cb: event->conn_type = %d\n", event->conn_type);
 		return;
 	}
 #endif
-
-	logger(LL_INFO,"idevice_event_cb: event->event %d\n",event->event);
-
+logger(LL_DEBUG,"idevice_event_cb: event->event %d\n",event->event);
 	if (event->event == IDEVICE_DEVICE_ADD) {
-		logger(LL_INFO,"idevice_event_cb: event->event == IDEVICE_DEVICE_ADD\n");
+		logger(LL_DEBUG,"idevice_event_cb: IDEVICE_DEVICE_ADD\n");
 		if (client->ignore_device_add_events) {
-			logger(LL_INFO,"idevice_event_cb: client->ignore_device_add_events\n");
+			logger(LL_DEBUG,"idevice_event_cb: client->ignore_device_add_events\n");
 			return;
 		}
 		if (normal_check_mode(client) == 0) {
@@ -286,7 +291,6 @@ static void idevice_event_cb(const idevice_event_t *event, void *userdata)
 			client->device = get_irecv_device(client);
 		}
 	} else if (event->event == IDEVICE_DEVICE_REMOVE) {
-		logger(LL_INFO,"idevice_event_cb: event->event == IDEVICE_DEVICE_REMOVE\n");
 		if (client->udid && !strcmp(event->udid, client->udid)) {
 			mutex_lock(&client->device_event_mutex);
 			client->mode = MODE_UNKNOWN;
@@ -300,19 +304,18 @@ static void idevice_event_cb(const idevice_event_t *event, void *userdata)
 
 static void irecv_event_cb(const irecv_device_event_t* event, void *userdata)
 {
-	logger(LL_DEBUG, "irecv_event_cb\n");
+	logger(LL_DEBUG,"irecv_event_cb\n");
+	logger(LL_DEBUG,"irecv_event_cb: event->type %d\n",event->type);
 	struct idevicerestore_client_t *client = (struct idevicerestore_client_t*)userdata;
-
 	if (event->type == IRECV_DEVICE_ADD) {
-
 		logger(LL_DEBUG,"irecv_event_cb IRECV_DEVICE_ADD event info: ecid=%016" PRIx64 " \n", event->device_info->ecid);
 		logger(LL_DEBUG,"irecv_event_cb IRECV_DEVICE_ADD client info: ecid=%016" PRIx64 " udid=%s\n", client->ecid, client->udid ? client->udid : "N/A");
+		logger(LL_DEBUG,"locking device_event_mutex\n");
 		if (!client->udid && !client->ecid) {
 			client->ecid = event->device_info->ecid;
 		}
 		if (client->ecid && event->device_info->ecid == client->ecid) {
-
-			logger(LL_DEBUG,"locking device_event_mutex\n");
+			logger(LL_DEBUG,"irecv_event_cb: client->ecid && event->device_info->ecid == client->ecid\n");
 			mutex_lock(&client->device_event_mutex);
 			switch (event->mode) {
 				case IRECV_K_WTF_MODE:
@@ -333,21 +336,16 @@ static void irecv_event_cb(const irecv_device_event_t* event, void *userdata)
 				default:
 					client->mode = MODE_UNKNOWN;
 			}
-			logger(LL_DEBUG,"%s: device %016" PRIx64 " (udid: %s) connected in %s mode\n", __func__, client->ecid, (client->udid) ? client->udid : "N/A", client->mode->string);
-			logger(LL_DEBUG,"cond_signal(&client->device_event_cond) at %p\n", &client->device_event_cond);
-
 			logger(LL_DEBUG, "%s: device %016" PRIx64 " (udid: %s) connected in %s mode\n", __func__, client->ecid, (client->udid) ? client->udid : "N/A", client->mode->string);
 			if (!client->device) {
 				client->device = get_irecv_device(client);
 			}
-
 			cond_signal(&client->device_event_cond);
 			mutex_unlock(&client->device_event_mutex);
 		}
 	} else if (event->type == IRECV_DEVICE_REMOVE) {
-		logger(LL_INFO,"irecv_event_cb IRECV_DEVICE_REMOVE event info: ecid=%016" PRIx64 " \n", event->device_info->ecid);
-		logger(LL_INFO,"irecv_event_cb IRECV_DEVICE_REMOVE client info: ecid=%016" PRIx64 " udid=%s\n", client->ecid, client->udid ? client->udid : "N/A");
-
+		logger(LL_DEBUG,"irecv_event_cb IRECV_DEVICE_REMOVE event info: ecid=%016" PRIx64 " \n", event->device_info->ecid);
+		logger(LL_DEBUG,"irecv_event_cb IRECV_DEVICE_REMOVE client info: ecid=%016" PRIx64 " udid=%s\n", client->ecid, client->udid ? client->udid : "N/A");
 		if (client->ecid && event->device_info->ecid == client->ecid) {
 			mutex_lock(&client->device_event_mutex);
 			client->mode = MODE_UNKNOWN;
@@ -358,17 +356,14 @@ static void irecv_event_cb(const irecv_device_event_t* event, void *userdata)
 				// have the actual device ECID and wouldn't get detected.
 				client->ecid = 0;
 			}
-			logger(LL_INFO,"cond_signal(&client->device_event_cond) at %p\n", &client->device_event_cond);
+			logger(LL_DEBUG,"cond_signal(&client->device_event_cond) at %p\n", &client->device_event_cond);
 			cond_signal(&client->device_event_cond);
 			mutex_unlock(&client->device_event_mutex);
 		}
 	}
-	logger(LL_INFO,"out") ;
 }
 
 int build_identity_check_components_in_ipsw(plist_t build_identity, ipsw_archive_t ipsw);
-
-
 int assertRecoveryMode(struct idevicerestore_client_t* client)
 {
 
@@ -384,17 +379,17 @@ int assertRecoveryMode(struct idevicerestore_client_t* client)
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 10000);
 		if (client->mode == MODE_UNKNOWN || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
-			error("ERROR: assertRecovery Unable to discover device mode. Please make sure a device is attached.\n");
+			logger(LL_ERROR," assertRecovery Unable to discover device mode. Please make sure a device is attached.\n");
 			return -1;
 		}
 	}
 	mutex_unlock(&client->device_event_mutex);
 	if (client->mode == MODE_NORMAL) {
-		logger(LL_INFO,"Device is in normal mode\n");
-		logger(LL_INFO,"Force recovery mode requested\n");
-		logger(LL_INFO,"Entering recovery mode...\n");
+		logger(LL_DEBUG,"Device is in normal mode\n");
+		logger(LL_DEBUG,"Force recovery mode requested\n");
+		logger(LL_DEBUG,"Entering recovery mode...\n");
 		if (normal_enter_recovery(client) < 0) {
-			error("ERROR: Unable to place device into recovery mode from normal mode\n");
+			logger(LL_ERROR," Unable to place device into recovery mode from normal mode\n");
 			if (client->tss)
 				plist_free(client->tss);
 			return -5;
@@ -402,7 +397,7 @@ int assertRecoveryMode(struct idevicerestore_client_t* client)
 		return 1;
 	}
 	if (client->mode == MODE_RECOVERY) {
-		logger(LL_INFO,"Device is in recovery mode\n");
+		logger(LL_DEBUG,"Device is in recovery mode\n");
 		return 0;
 	}
 
@@ -410,9 +405,6 @@ int assertRecoveryMode(struct idevicerestore_client_t* client)
 
 	return 0;
 }
-
-
-
 int idevicerestore_start(struct idevicerestore_client_t* client)
 {
 	int tss_enabled = 0;
@@ -458,22 +450,23 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 
 	// check which mode the device is currently in so we know where to start
 	mutex_lock(&client->device_event_mutex);
+
+
+
 	while (client->mode == MODE_UNKNOWN) {
-		logger(LL_INFO,"Waiting for device to connect...\n");
+		logger(LL_DEBUG,"Waiting for device to connect...\n");
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 10000);
-		logger(LL_INFO,"Waiting over connected\n");
+		logger(LL_DEBUG,"Waiting over connected\n");
 		if( (client->flags & FLAG_QUIT))
 		{
-			logger(LL_INFO,"Quitting...\n");
+			logger(LL_DEBUG,"Quitting...\n");
 			mutex_unlock(&client->device_event_mutex);
-
-			logger(LL_ERROR, "Unable to discover device mode. Please make sure a device is attached.\n");
 
 			return -1;
 		}
 		if (client->mode == MODE_UNKNOWN) {
 			mutex_unlock(&client->device_event_mutex);
-			error("ERROR: idevicerestore_start: Unable to discover device mode. Please make sure a device is attached.\n");
+			logger(LL_ERROR," idevicerestore_start: Unable to discover device mode. Please make sure a device is attached.\n");
 	
 		}
 	}
@@ -481,9 +474,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 	logger(LL_INFO, "Found device in %s mode\n", client->mode->string);
 	mutex_unlock(&client->device_event_mutex);
 
-
-
-	logger(LL_INFO,"Found device  mode index %d \n", client->mode->index);
 	if (client->mode == MODE_WTF) {
 		unsigned int cpid = 0;
 
@@ -606,6 +596,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 	logger(LL_INFO, "Device Product Build: %s\n", (client->device_build) ? client->device_build : "N/A");
 
 	if (client->flags & FLAG_PWN) {
+#ifdef HAVE_LIMERA1N
 		recovery_client_free(client);
 
 		if (client->mode != MODE_DFU) {
@@ -635,6 +626,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			logger(LL_ERROR, "This device is not supported by the limera1n exploit");
 			return -1;
 		}
+#endif
 	}
 
 	if (client->flags & FLAG_LATEST) {
@@ -775,10 +767,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 60000);
 			if (client->mode == MODE_UNKNOWN || (client->flags & FLAG_QUIT)) {
 				mutex_unlock(&client->device_event_mutex);
-				error("ERROR: MODE_RESTORE Unable to discover device mode. Please make sure a device is attached.\n");
-
-				logger(LL_ERROR, "Unable to discover device mode. Please make sure a device is attached.\n");
-
+				logger(LL_ERROR, "MODE_RESTORE Unable to discover device mode. Please make sure a device is attached.\n");
 				return -1;
 			}
 			logger(LL_INFO, "Found device in %s mode\n", client->mode->string);
@@ -1479,6 +1468,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		// if the device is in DFU mode, place it into recovery mode
 		dfu_client_free(client);
 		recovery_client_free(client);
+#ifdef HAVE_LIMERA1N
 		if ((client->flags & FLAG_CUSTOM) && limera1n_is_supported(client->device)) {
 			logger(LL_INFO, "connecting to DFU\n");
 			if (dfu_client_new(client) < 0) {
@@ -1493,6 +1483,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			dfu_client_free(client);
 			logger(LL_INFO, "exploited\n");
 		}
+#endif
 		if (dfu_enter_recovery(client, build_identity) < 0) {
 			logger(LL_ERROR, "Unable to place device into recovery mode from DFU mode\n");
 			if (client->tss)
@@ -1527,7 +1518,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		while(tries-- && (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT))) {
 			logger(LL_DEBUG,"cond_wait_timeout retry\n");
 			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
-		}		
+		}
 		if (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
 
@@ -1537,9 +1528,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			return -2;
 		}
 		recovery_client_free(client);
-		logger(LL_DEBUG,"Waiting for device to reconnect in recovery mode ...\n");
 		logger(LL_DEBUG, "Waiting for device to reconnect in recovery mode...\n");
-
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 60000);
 		tries = 3 ;
 		while(tries-- && (client->mode != MODE_RECOVERY || (client->flags & FLAG_QUIT))) {
@@ -1601,42 +1590,24 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		return -1;
 	}
 
-
+	// now finally do the magic to put the device into restore mode
 	int tries = 3 ;
 	while(client->mode != MODE_RESTORE && tries--){
 
 			// now finally do the magic to put the device into restore mode
 		if (client->mode == MODE_RECOVERY) {
 			if (recovery_enter_restore(client, build_identity) < 0) {
-				error("ERROR: Unable to place device into restore mode\n");
+				logger(LL_ERROR," Unable to place device into restore mode\n");
 				if (client->tss)
 					plist_free(client->tss);
 				return -2;
-			}
-		}	
-		recovery_client_free(client);
-	}
-	idevicerestore_progress(client, RESTORE_STEP_PREPARE, 0.9);
-
-	if (client->mode != MODE_RESTORE) {
-		mutex_lock(&client->device_event_mutex);
-		logger(LL_INFO, "Waiting for device to enter restore mode...\n");
-		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 300000);
-		if (client->mode != MODE_RESTORE || (client->flags & FLAG_QUIT)) {
-			mutex_unlock(&client->device_event_mutex);
-			logger(LL_ERROR, "Device failed to enter restore mode.\n");
-			if (client->mode == MODE_UNKNOWN) {
-				logger(LL_ERROR, "Make sure that usbmuxd is running.\n");
-			} else if (client->mode == MODE_RECOVERY || client->mode == MODE_DFU) {
-				logger(LL_ERROR, "Device reconnected in %s mode, most likely image personalization failed.\n", client->mode->string);
-
 			}
 		}
 		idevicerestore_progress(client, RESTORE_STEP_PREPARE, 0.9);
 		if (client->mode != MODE_RESTORE) {
 			mutex_lock(&client->device_event_mutex);
-			logger(LL_INFO,"Waiting for device to enter restore mode...\n");
-			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 180000);
+			logger(LL_DEBUG,"Waiting for device to enter restore mode...\n");
+			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 300000);
 			int tries = 13 ;
 			while(tries-- && (client->mode != MODE_RESTORE || (client->flags & FLAG_QUIT))) {
 				logger(LL_DEBUG,"cond_wait_timeout retry\n");
@@ -1644,13 +1615,13 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			}
 			if (client->mode != MODE_RESTORE || (client->flags & FLAG_QUIT)) {
 				mutex_unlock(&client->device_event_mutex);
-				error("ERROR: Device failed to enter restore mode.\n");
+				logger(LL_ERROR," Device failed to enter restore mode.\n");
 				if (client->mode == MODE_UNKNOWN) {
-					error("Make sure that usbmuxd is running.\n");
+					logger(LL_ERROR,"Make sure that usbmuxd is running.\n");
 				} else if (client->mode == MODE_RECOVERY) {
-					error("Device reconnected in recovery mode, most likely image personalization failed.\n");
+					logger(LL_ERROR,"Device reconnected in recovery mode, most likely image personalization failed.\n");
 					if(tries){
-						error("retrying") ;
+						logger(LL_ERROR,"retrying") ;
 
 					}
 				}
@@ -1683,6 +1654,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			return result;
 		}
 	}
+
 	/* special handling of older AppleTVs as they enter Recovery mode on boot when plugged in to USB */
 	if ((strncmp(client->device->product_type, "AppleTV", 7) == 0) && (client->device->product_type[7] < '5')) {
 		if (recovery_client_new(client) == 0) {
@@ -1865,9 +1837,7 @@ void plain_progress_cb(int step, double step_progress, void* userdata)
 {
 	printf("progress: %u %f\n", step, step_progress);
 	fflush(stdout);
-	fflush(stderr);
 }
-
 
 static void plain_progress_func(struct progress_info_entry** progress_info, int count)
 {
@@ -1900,9 +1870,8 @@ static void tty_print(enum loglevel level, const char* fmt, va_list ap)
 	cprintf(COLOR_RESET);
 }
 
-int main(int argc, char* argv[]) {
-	//setbuf(stdout, NULL);
-	//setbuf(stderr, NULL);
+int main(int argc, char* argv[])
+{
 	int opt = 0;
 	int optindex = 0;
 	char* ipsw = NULL;
@@ -1941,7 +1910,13 @@ int main(int argc, char* argv[]) {
 		client->flags |= FLAG_INTERACTIVE;
 	}
 
-	while ((opt = getopt_long(argc, argv, "dhcers:xtpli:u:nC:kyPRT:zv", longopts, &optindex)) > 0) {
+#ifdef HAVE_LIMERA1N
+#define P_FLAG "p"
+#else
+#define P_FLAG ""
+#endif
+
+	while ((opt = getopt_long(argc, argv, "dhcers:xtli:u:nC:kyPRT:zv" P_FLAG, longopts, &optindex)) > 0) {
 		switch (opt) {
 		case 'h':
 			usage(argc, argv, 0);
@@ -2036,9 +2011,11 @@ int main(int argc, char* argv[]) {
 			idevicerestore_keep_pers = 1;
 			break;
 
+#ifdef HAVE_LIMERA1N
 		case 'p':
 			client->flags |= FLAG_PWN;
 			break;
+#endif
 
 		case 'n':
 			client->flags |= FLAG_NOACTION;
@@ -2055,7 +2032,7 @@ int main(int argc, char* argv[]) {
 		case 'P':
 			idevicerestore_set_progress_callback(client, plain_progress_cb, NULL);
 			set_update_progress_func(plain_progress_func);
-			set_progress_granularity(0.01); // 1% granularity
+			set_progress_granularity(0.1); // 1% granularity
 			break;
 
 		case 'R':
@@ -2110,18 +2087,6 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-
-
-
-
-
-
-
-
-
-
-
-
 	if (ipsw_info) {
 		if (argc-optind != 1) {
 			logger(LL_ERROR, "--ipsw-info requires an IPSW path.\n");
@@ -2147,16 +2112,8 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (!logfile) {
-		char logfn[256];
-		int64_t timestamp = time(NULL);
-		if (client->ecid) {
-			snprintf(logfn, sizeof(logfn), "restore_%016" PRIx64 "_%" PRIi64 ".log", client->ecid, timestamp);
-		} else if (client->udid) {
-			snprintf(logfn, sizeof(logfn), "restore_%s_%" PRIi64 ".log", client->udid, timestamp);
-		} else {
-			snprintf(logfn, sizeof(logfn), "restore_%" PRIi64 ".log", timestamp);
-		}
-		logger_set_logfile(logfn);
+		// Automatic log file creation disabled - log only to stderr
+		logger_set_logfile("NULL");
 	} else {
 		logger_set_logfile(logfile);
 	}
@@ -2170,46 +2127,26 @@ int main(int argc, char* argv[]) {
 			logger(LL_ERROR, "Firmware file %s cannot be opened.\n", ipsw);
 			return -1;
 		}
-		logger(LL_INFO,"ipsw OK") ;
-
 	}
-	else {
-		logger(LL_INFO,"no ipsw") ;
-	}
-
-
-
-
-
-
-
 
 	curl_global_init(CURL_GLOBAL_ALL);
-
-
-
-	// Handle force recovery mode if requested
-	if (client->flags & FLAG_FORCE_RECOVERY) {
-		logger(LL_INFO,"flag force recover is on\n");
+// Handle force recovery mode if requested
+	if ((client->flags & FLAG_FORCE_RECOVERY)) {
+		logger(LL_DEBUG,"flag force recover is on\n");
 		int ret = assertRecoveryMode(client);
 		if(ret==0){
-			logger(LL_INFO,"Device was already in recovery mode\n");
+			logger(LL_DEBUG,"Device was already in recovery mode\n");
 		}
 		else if(ret==1){
-			logger(LL_INFO,"Device was not in recovery mode, but force recovery mode was requested\n");
+			logger(LL_DEBUG,"Device was not in recovery mode, but force recovery mode was requested\n");
 		}
 		else{
-			logger(LL_INFO,"Device is not in recovery mode\n");
+			logger(LL_DEBUG,"Device is not in recovery mode\n");
 			
 		}
-	
+
 	}
-
-
-
-
 	client->flags |= FLAG_IN_PROGRESS;
-
 	result = idevicerestore_start(client);
 	client->flags &= ~FLAG_IN_PROGRESS;
 
@@ -2223,24 +2160,17 @@ int main(int argc, char* argv[]) {
 
 irecv_device_t get_irecv_device(struct idevicerestore_client_t *client)
 {
-	logger(LL_INFO,"get_irecv_device");
 	int mode = _MODE_UNKNOWN;
 
 	if (client->mode) {
 		mode = client->mode->index;
-		logger(LL_INFO,"get_irecv_device mode:%x",mode);
-	}
-	else {
-		logger(LL_INFO,"get_irecv_device NO mode");
 	}
 
 	switch (mode) {
 	case _MODE_RESTORE:
-		logger(LL_INFO,"calling restore_get_irecv_device\n");
 		return restore_get_irecv_device(client);
 
 	case _MODE_NORMAL:
-		logger(LL_INFO,"calling normal_get_irecv_device\n");
 		return normal_get_irecv_device(client);
 
 	case _MODE_DFU:
@@ -2658,7 +2588,6 @@ int get_tss_response(struct idevicerestore_client_t* client, plist_t build_ident
 		normal_get_preflight_info(client, &pinfo);
 		client->preflight_info = pinfo;
 	}
-
 
 	/* send request and grab response */
 	response = tss_request_send(request, client->tss_url);

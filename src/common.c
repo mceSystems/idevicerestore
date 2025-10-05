@@ -302,7 +302,7 @@ int prompt_user(const char* title, const char* text)
 }
 
 static void (*update_progress_func)(struct progress_info_entry** list, int count) = NULL;
-static double progress_granularity = 0.001;
+static double progress_granularity = 0.1;
 
 void set_update_progress_func(void (*func)(struct progress_info_entry** list, int count))
 {
@@ -439,7 +439,7 @@ void set_progress(uint32_t tag, double progress)
 	if (progress < 0) progress = 0;
 	if (progress > 1.0) progress = 1.0;
 	found->progress = progress;
-	if ((progress == 0) || (found->progress - found->lastprog >= progress_granularity)) {
+	if ((found->progress != found->lastprog) && ((progress == 0) || (found->progress - found->lastprog >= progress_granularity))) {
 		if (update_progress_func) {
 			update_progress_func((struct progress_info_entry**)(&progress_info)->list, progress_info.capacity);
 		} else {
