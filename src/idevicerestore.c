@@ -1518,7 +1518,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		while(tries-- && (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT))) {
 			logger(LL_DEBUG,"cond_wait_timeout retry\n");
 			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
-		}
+		}	
 		if (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
 
@@ -1594,29 +1594,29 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 	int tries = 3 ;
 	while(client->mode != MODE_RESTORE && tries--){
 
-			// now finally do the magic to put the device into restore mode
-		if (client->mode == MODE_RECOVERY) {
-			if (recovery_enter_restore(client, build_identity) < 0) {
+	// now finally do the magic to put the device into restore mode
+	if (client->mode == MODE_RECOVERY) {
+		if (recovery_enter_restore(client, build_identity) < 0) {
 				logger(LL_ERROR," Unable to place device into restore mode\n");
-				if (client->tss)
-					plist_free(client->tss);
-				return -2;
-			}
+			if (client->tss)
+				plist_free(client->tss);
+			return -2;
 		}
-		idevicerestore_progress(client, RESTORE_STEP_PREPARE, 0.9);
-		if (client->mode != MODE_RESTORE) {
-			mutex_lock(&client->device_event_mutex);
+	}
+	idevicerestore_progress(client, RESTORE_STEP_PREPARE, 0.9);
+	if (client->mode != MODE_RESTORE) {
+		mutex_lock(&client->device_event_mutex);
 			logger(LL_DEBUG,"Waiting for device to enter restore mode...\n");
-			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 300000);
-			int tries = 13 ;
-			while(tries-- && (client->mode != MODE_RESTORE || (client->flags & FLAG_QUIT))) {
-				logger(LL_DEBUG,"cond_wait_timeout retry\n");
-				cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
-			}
-			if (client->mode != MODE_RESTORE || (client->flags & FLAG_QUIT)) {
-				mutex_unlock(&client->device_event_mutex);
+		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 300000);
+		int tries = 13 ;
+		while(tries-- && (client->mode != MODE_RESTORE || (client->flags & FLAG_QUIT))) {
+			logger(LL_DEBUG,"cond_wait_timeout retry\n");
+			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+		}
+		if (client->mode != MODE_RESTORE || (client->flags & FLAG_QUIT)) {
+			mutex_unlock(&client->device_event_mutex);
 				logger(LL_ERROR," Device failed to enter restore mode.\n");
-				if (client->mode == MODE_UNKNOWN) {
+			if (client->mode == MODE_UNKNOWN) {
 					logger(LL_ERROR,"Make sure that usbmuxd is running.\n");
 				} else if (client->mode == MODE_RECOVERY) {
 					logger(LL_ERROR,"Device reconnected in recovery mode, most likely image personalization failed.\n");
@@ -1627,12 +1627,12 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 				}
 				else 
 				{
-					return -1;
+			return -1;
 
 				}
 				
-			}
-			mutex_unlock(&client->device_event_mutex);
+		}
+		mutex_unlock(&client->device_event_mutex);
 		}
 
 

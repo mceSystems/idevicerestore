@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <unistd.h>
 #include <errno.h>
 #include <libgen.h>
@@ -439,7 +440,10 @@ void set_progress(uint32_t tag, double progress)
 	if (progress < 0) progress = 0;
 	if (progress > 1.0) progress = 1.0;
 	found->progress = progress;
-	if ((found->progress != found->lastprog) && ((progress == 0) || (found->progress - found->lastprog >= progress_granularity))) {
+	// Only update if the displayed percentage (1 decimal place) would change
+	double displayed_progress = round(found->progress * 10.0) / 10.0;
+	double displayed_lastprog = round(found->lastprog * 10.0) / 10.0;
+	if ((displayed_progress != displayed_lastprog) && ((progress == 0) || (found->progress - found->lastprog >= progress_granularity))) {
 		if (update_progress_func) {
 			update_progress_func((struct progress_info_entry**)(&progress_info)->list, progress_info.capacity);
 		} else {

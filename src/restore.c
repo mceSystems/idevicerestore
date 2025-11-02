@@ -4230,7 +4230,7 @@ static int _restore_send_file_data(struct _restore_send_file_data_ctx* rctx, con
 
 	if (total_size > 0x1000000) {
 		double progress = (double)done / (double)total_size;
-		set_progress(rctx->tag, progress);
+		// set_progress(rctx->tag, progress); // Commented out to prevent repetitive progress spam
 		int progress_int = (int)(progress*100.0);
 		if (progress_int > rctx->last_progress) {
 			idevicerestore_progress(rctx->client, RESTORE_STEP_UPLOAD_IMG, progress);
