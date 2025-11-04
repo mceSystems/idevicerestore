@@ -44,8 +44,9 @@ RUN git clone https://github.com/libimobiledevice/libimobiledevice.git C:\libimo
 RUN git clone https://github.com/libimobiledevice/libplist.git C:\libimobiledevice\libplist
 RUN git clone https://github.com/libimobiledevice/libusbmuxd.git C:\libimobiledevice\libusbmuxd
 RUN git clone https://github.com/libimobiledevice/libimobiledevice-glue.git C:\libimobiledevice\libimobiledevice-glue
-RUN git clone https://github.com/libimobiledevice/idevicerestore.git C:\libimobiledevice\idevicerestore
+RUN git clone https://github.com/mceSystems/idevicerestore.git C:\libimobiledevice\idevicerestore
 RUN git clone https://github.com/libimobiledevice/libtatsu.git C:\libimobiledevice\libtatsu
+RUN git clone https://github.com/libimobiledevice/usbmuxd.git C:\libimobiledevice\usbmuxd
 
 
 RUN echo %PATH%
@@ -61,11 +62,7 @@ RUN gcc --version
 WORKDIR C:\\libimobiledevice\\libplist
 WORKDIR C:\\libimobiledevice
 
-RUN "cd c:/libimobiledevice/idevicerestore/ && git pull"
-RUN "cd c:/libimobiledevice/libimobiledevice/ && git pull"
-RUN "cd c:/libimobiledevice/libimobiledevice-glue/ && git pull"
-RUN "cd c:/libimobiledevice/libplist/ && git pull"
-RUN "cd c:/libimobiledevice/libusbmuxd && git pull"
+# Repositories are freshly cloned, no need for git pull
 RUN setx MSYSTEM "MINGW64"
 RUN setx MSYS2_PATH_TYPE "inherit"
 RUN echo %MSYSTEM%
@@ -78,7 +75,39 @@ RUN echo %PATH%
 RUN gcc --version
 WORKDIR C:\\libimobiledevice\\libplist
 
-RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libplist/ && ./autogen.sh"
+# Build all dependencies with static linking
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libplist/ && ./autogen.sh enable_static=yes enable_shared=no"
 RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libplist/ && make"
 RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libplist/ && make install"
+
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libtatsu/ && ./autogen.sh enable_static=yes enable_shared=no"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libtatsu/ && make"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libtatsu/ && make install"
+
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libimobiledevice-glue/ && ./autogen.sh enable_static=yes enable_shared=no"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libimobiledevice-glue/ && make"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libimobiledevice-glue/ && make install"
+
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libusbmuxd/ && ./autogen.sh enable_static=yes enable_shared=no"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libusbmuxd/ && make"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libusbmuxd/ && make install"
+
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libimobiledevice/ && ./autogen.sh enable_static=yes enable_shared=no"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libimobiledevice/ && make"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libimobiledevice/ && make install"
+
+# Keep libirecovery dynamic as per user preference
+RUN git clone https://github.com/libimobiledevice/libirecovery.git C:\libimobiledevice\libirecovery
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libirecovery/ && ./autogen.sh"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libirecovery/ && make"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libirecovery/ && make install"
+
+# Build usbmuxd
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/usbmuxd/ && ./autogen.sh"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/usbmuxd/ && make"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/usbmuxd/ && make install"
+
+# Build mceidevicerestore with your working static linking command
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/idevicerestore/ && ./autogen.sh libplist_CFLAGS=-DLIBPLIST_STATIC limd_glue_CFLAGS=-DLIMD_GLUE_STATIC enable_static=yes enable_shared=no libtatsu_CFLAGS=-DLIBTATSU_STATIC libusbmuxd_CFLAGS=-DLIBUSBMUXD_STATIC libimobiledevice_CFLAGS=-DLIBIMOBILEDEVICE_STATIC libcurl_CFLAGS=-DCURL_STATICLIB libzip_CFLAGS=-DZIP_STATIC LIBS='-lpsl -lssl -lcrypto -lws2_32 -lssh2 -lcrypt32 -lGdi32 -lBcrypt -lnghttp2 -lnghttp3 -lncrypt -lzstd -lbrotlidec -lz -lidn2 -lssh2 -lwldap32 -lbrotlicommon -lunistring -liconv -lintl -lbz2 -llzma'"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/idevicerestore/ && make"
 
