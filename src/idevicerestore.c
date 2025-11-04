@@ -1444,6 +1444,11 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 
 		logger(LL_DEBUG, "Waiting for device to disconnect...\n");
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 60000);
+		int tries = 3 ;
+		while(tries-- && (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT))) {
+			logger(LL_DEBUG, "cond_wait_timeout retry\n");
+			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+		}	
 		if (client->mode != MODE_UNKNOWN || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
 
@@ -1526,6 +1531,11 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		mutex_lock(&client->device_event_mutex);
 		logger(LL_INFO, "Waiting for device to enter restore mode...\n");
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 300000);
+		int tries = 13 ;
+		while(tries-- && (client->mode != MODE_RESTORE || (client->flags & FLAG_QUIT))) {
+			logger(LL_DEBUG, "cond_wait_timeout retry\n");
+			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+		}
 		if (client->mode != MODE_RESTORE || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
 			logger(LL_ERROR, "Device failed to enter restore mode.\n");
