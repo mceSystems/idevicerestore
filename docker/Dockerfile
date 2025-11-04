@@ -74,9 +74,19 @@ RUN git clone https://github.com/libimobiledevice/usbmuxd.git  && \
     cd .. && \
     rm usbmuxd -rf
 
-RUN git clone https://github.com/libimobiledevice/idevicerestore.git && \
+# Build mceidevicerestore (your fork) with static linking
+RUN git clone https://github.com/mceSystems/idevicerestore.git && \
     cd idevicerestore && \
-    ./autogen.sh && \
+    ./autogen.sh \
+        libplist_CFLAGS=-DLIBPLIST_STATIC \
+        limd_glue_CFLAGS=-DLIMD_GLUE_STATIC \
+        enable_static=yes enable_shared=no \
+        libtatsu_CFLAGS=-DLIBTATSU_STATIC \
+        libusbmuxd_CFLAGS=-DLIBUSBMUXD_STATIC \
+        libimobiledevice_CFLAGS=-DLIBIMOBILEDEVICE_STATIC \
+        libcurl_CFLAGS=-DCURL_STATICLIB \
+        libzip_CFLAGS=-DZIP_STATIC \
+        LIBS="-lpsl -lssl -lcrypto -lssh2 -lnghttp2 -lnghttp3 -lzstd -lbrotlidec -lz -lidn2 -lbrotlicommon -lunistring -liconv -lintl -lbz2 -llzma" && \
     make && \
     make install && \
     cd .. && \

@@ -21,7 +21,10 @@ AM_LDFLAGS = \
 	$(libtatsu_LIBS) \
 	$(libzip_LIBS) \
 	$(zlib_LIBS) \
-	$(libcurl_LIBS)
+	$(libcurl_LIBS) \
+	$(libssl_LIBS) \
+	$(libcrypto_LIBS) \
+	-lmingwex
 
 AM_LDADD = $(AC_LDADD)
 

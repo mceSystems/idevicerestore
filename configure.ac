@@ -15,7 +15,7 @@ if test -z $PACKAGE_VERSION; then
 fi
 
 # Minimum package versions
-LIBIRECOVERY_VERSION=1.3.0
+LIBIRECOVERY_VERSION=1.2.1
 LIBIMOBILEDEVICE_VERSION=1.4.0
 LIBUSBMUXD_VERSION=2.0.2
 LIBPLIST_VERSION=2.6.0
@@ -85,6 +85,7 @@ case ${host_os} in
     win32=true
     GLOBAL_CFLAGS+=" -DWIN32 -D__LITTLE_ENDIAN__=1"
     AC_LDFLAGS+=" -static-libgcc"
+    AC_LDADD+=" -lintl -liconv -lcrypt32 -lzip -lz -lws2_32 -lgdi32 -ladvapi32 -luser32 -lole32 -liphlpapi"
     ;;
   darwin*)
     AC_MSG_RESULT([${host_os}])
@@ -162,9 +163,76 @@ AM_CONDITIONAL([HAVE_LIMERA1N],[test "x$have_limera1n" = "xyes"])
 
 CFLAGS="$CACHED_CFLAGS"
 
+
+# Add static build flags AND override library paths to use .a files
+if test "x$enable_static" = "xyes" -a "x$enable_shared" = "xno"; then
+  GLOBAL_CFLAGS+=" -DIDEVICERESTORE_STATIC"
+  libimobiledevice_CFLAGS+=" -DLIBIMOBILEDEVICE_STATIC"
+  libusbmuxd_CFLAGS+=" -DLIBUSBMUXD_STATIC"
+  libplist_CFLAGS+=" -DLIBPLIST_STATIC"
+  limd_glue_CFLAGS+=" -DLIMD_GLUE_STATIC"
+  libtatsu_CFLAGS+=" -DLIBTATSU_STATIC"
+  libzip_CFLAGS+=" -DLIBZIP_STATIC"
+  libcurl_CFLAGS+=" -DCURL_STATICLIB"
+  
+  # Override library paths to use static .a files (pkg-config returns -l* which is DLL-style)
+  # Check common MinGW installation paths for static libraries
+  for libdir in /mingw64/lib /usr/local/lib /usr/lib; do
+    if test -f "${libdir}/libplist-2.0.a" -a -z "${libplist_LIBS_SET}"; then
+      libplist_LIBS="${libdir}/libplist-2.0.a"
+      libplist_LIBS_SET=yes
+    fi
+    if test -f "${libdir}/libimobiledevice-1.0.a" -a -z "${libimobiledevice_LIBS_SET}"; then
+      libimobiledevice_LIBS="${libdir}/libimobiledevice-1.0.a"
+      libimobiledevice_LIBS_SET=yes
+    fi
+    if test -f "${libdir}/libusbmuxd-2.0.a" -a -z "${libusbmuxd_LIBS_SET}"; then
+      libusbmuxd_LIBS="${libdir}/libusbmuxd-2.0.a"
+      libusbmuxd_LIBS_SET=yes
+    fi
+    if test -f "${libdir}/libimobiledevice-glue-1.0.a" -a -z "${limd_glue_LIBS_SET}"; then
+      limd_glue_LIBS="${libdir}/libimobiledevice-glue-1.0.a"
+      limd_glue_LIBS_SET=yes
+    fi
+    if test -f "${libdir}/libtatsu.a" -a -z "${libtatsu_LIBS_SET}"; then
+      libtatsu_LIBS="${libdir}/libtatsu.a"
+      libtatsu_LIBS_SET=yes
+    fi
+    if test -f "${libdir}/libcurl.a" -a -z "${libcurl_LIBS_SET}"; then
+      libcurl_LIBS="${libdir}/libcurl.a"
+      libcurl_LIBS_SET=yes
+    fi
+    if test -f "${libdir}/libzip.a" -a -z "${libzip_LIBS_SET}"; then
+      libzip_LIBS="${libdir}/libzip.a"
+      libzip_LIBS_SET=yes
+    fi
+    if test -f "${libdir}/libz.a" -a -z "${zlib_LIBS_SET}"; then
+      zlib_LIBS="${libdir}/libz.a"
+      zlib_LIBS_SET=yes
+    fi
+    # OpenSSL libraries (needed by libcurl)
+    if test -f "${libdir}/libssl.a" -a -z "${libssl_LIBS_SET}"; then
+      libssl_LIBS="${libdir}/libssl.a"
+      libssl_LIBS_SET=yes
+    fi
+    if test -f "${libdir}/libcrypto.a" -a -z "${libcrypto_LIBS_SET}"; then
+      libcrypto_LIBS="${libdir}/libcrypto.a"
+      libcrypto_LIBS_SET=yes
+    fi
+  done
+  # Initialize if not found
+  if test -z "${libssl_LIBS}"; then
+    libssl_LIBS="-lssl"
+  fi
+  if test -z "${libcrypto_LIBS}"; then
+    libcrypto_LIBS="-lcrypto"
+  fi
+fi
 AC_SUBST(GLOBAL_CFLAGS)
 AC_SUBST(AC_LDFLAGS)
 AC_SUBST(AC_LDADD)
+AC_SUBST(libssl_LIBS)
+AC_SUBST(libcrypto_LIBS)
 
 # check for large file support
 AC_SYS_LARGEFILE
