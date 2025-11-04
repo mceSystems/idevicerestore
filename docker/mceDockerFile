@@ -1,0 +1,84 @@
+
+
+# Use the official Microsoft Windows Server image
+#FROM mcr.microsoft.com/windows/servercore:ltsc2019
+FROM mcr.microsoft.com/windows/server:ltsc2022
+RUN echo
+ARG MSYS2_INSTALLER_URL=https://github.com/msys2/msys2-installer/releases/download/2020-06-29/msys2-base-x86_64-20200629.sfx.exe
+
+RUN curl -L -o C:\msys2.exe %MSYS2_INSTALLER_URL%
+RUN C:\msys2.exe -y -o"C:\"
+
+RUN C:\msys64\usr\bin\bash.exe -lc " "
+RUN C:\msys64\usr\bin\bash.exe -lc  'pacman --noconfirm -Syuu'; 
+RUN C:\msys64\usr\bin\bash.exe -lc  'pacman --noconfirm -Scc'; 
+RUN C:\msys64\usr\bin\bash.exe -lc  "pacman -Syu --noconfirm" ;
+RUN C:\msys64\usr\bin\bash.exe -lc  "pacman -S --noconfirm git" ; 
+#RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-make-4.4.1-3-any.pkg.tar.zst"
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-libtool-2.5.3-1-any.pkg.tar.zst"
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/msys/x86_64/autoconf2.72-2.72-2-any.pkg.tar.zst" ;
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/msys/x86_64/cython-3.0.10-1-x86_64.pkg.tar.zst" ;
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-python-3.11.9-1-any.pkg.tar.zst" ;
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/msys/x86_64/curl-8.11.0-2-x86_64.pkg.tar.zst" ;
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-curl-8.11.0-2-any.pkg.tar.zst" ;
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/msys/x86_64/gcc-13.3.0-1-x86_64.pkg.tar.zst" ;
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-gcc-14.2.0-2-any.pkg.tar.zst ;
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-pkg-config-0.29.2-6-any.pkg.tar.zst" ;
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/msys/x86_64/msys2-runtime-3.5.4-7-x86_64.pkg.tar.zst" ;
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/msys/x86_64/automake1.17-1.17-1-any.pkg.tar.zst" ;
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/msys/x86_64/filesystem-2023.02.07-2-x86_64.pkg.tar.zst";
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-libzip-1.10.1-2-any.pkg.tar.zst";
+
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -U --noconfirm https://mirror.msys2.org/msys/x86_64/gcc-13.3.0-1-x86_64.pkg.tar.zst"
+
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm make" ;
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm msys/automake-wrapper" ;
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm msys/autoconf" ;
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm msys/libtool" ;
+RUN mkdir C:\libimobiledevice
+WORKDIR C:\\libimobiledevice
+RUN powershell -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+RUN choco install git -y
+RUN git --version
+RUN git clone https://github.com/libimobiledevice/libimobiledevice.git C:\libimobiledevice\libimobiledevice
+RUN git clone https://github.com/libimobiledevice/libplist.git C:\libimobiledevice\libplist
+RUN git clone https://github.com/libimobiledevice/libusbmuxd.git C:\libimobiledevice\libusbmuxd
+RUN git clone https://github.com/libimobiledevice/libimobiledevice-glue.git C:\libimobiledevice\libimobiledevice-glue
+RUN git clone https://github.com/libimobiledevice/idevicerestore.git C:\libimobiledevice\idevicerestore
+RUN git clone https://github.com/libimobiledevice/libtatsu.git C:\libimobiledevice\libtatsu
+
+
+RUN echo %PATH%
+RUN setx path "%path%;C:\msys64\mingw64\bin"
+RUN dir /s /b C:\msys64\*gcc*.exe
+
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -Qe"
+RUN setx MSYS2_PATH_TYPE "inherit"
+
+
+RUN echo %PATH%
+RUN gcc --version
+WORKDIR C:\\libimobiledevice\\libplist
+WORKDIR C:\\libimobiledevice
+
+RUN "cd c:/libimobiledevice/idevicerestore/ && git pull"
+RUN "cd c:/libimobiledevice/libimobiledevice/ && git pull"
+RUN "cd c:/libimobiledevice/libimobiledevice-glue/ && git pull"
+RUN "cd c:/libimobiledevice/libplist/ && git pull"
+RUN "cd c:/libimobiledevice/libusbmuxd && git pull"
+RUN setx MSYSTEM "MINGW64"
+RUN setx MSYS2_PATH_TYPE "inherit"
+RUN echo %MSYSTEM%
+RUN dir /s /b C:\msys64\*gcc*.exe
+
+
+RUN echo %PATH%
+RUN setx path "%path%;C:\msys64\mingw64\bin"
+RUN echo %PATH%
+RUN gcc --version
+WORKDIR C:\\libimobiledevice\\libplist
+
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libplist/ && ./autogen.sh"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libplist/ && make"
+RUN C:\msys64\usr\bin\bash.exe -lc "cd c:/libimobiledevice/libplist/ && make install"
+
