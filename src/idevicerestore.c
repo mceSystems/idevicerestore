@@ -344,7 +344,47 @@ static void irecv_event_cb(const irecv_device_event_t* event, void *userdata)
 }
 
 int build_identity_check_components_in_ipsw(plist_t build_identity, ipsw_archive_t ipsw);
+int assertRecoveryMode(struct idevicerestore_client_t* client)
+{
 
+	logger(LL_INFO, "assertRecoveryMode\n");
+	irecv_device_event_subscribe(&client->irecv_e_ctx, irecv_event_cb, client);
+
+	idevice_event_subscribe(idevice_event_cb, client);
+	client->idevice_e_ctx = idevice_event_cb;
+
+	// check which mode the device is currently in so we know where to start
+	mutex_lock(&client->device_event_mutex);
+	if (client->mode == MODE_UNKNOWN) {
+		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 10000);
+		if (client->mode == MODE_UNKNOWN || (client->flags & FLAG_QUIT)) {
+			mutex_unlock(&client->device_event_mutex);
+			logger(LL_ERROR, "ERROR: Unable to discover device mode. Please make sure a device is attached.\n");
+			return -1;
+		}
+	}
+	mutex_unlock(&client->device_event_mutex);
+	if (client->mode == MODE_NORMAL) {
+		logger(LL_INFO, "Device is in normal mode\n");
+		logger(LL_INFO, "Force recovery mode requested\n");
+		logger(LL_INFO, "Entering recovery mode...\n");
+		if (normal_enter_recovery(client) < 0) {
+			logger(LL_ERROR, "ERROR: Unable to place device into recovery mode from normal mode\n");
+			if (client->tss)
+				plist_free(client->tss);
+			return -5;
+		}
+		return 1;
+	}
+	if (client->mode == MODE_RECOVERY) {
+		logger(LL_INFO, "Device is in recovery mode\n");
+		return 0;
+	}
+
+
+
+	return 0;
+}
 int idevicerestore_start(struct idevicerestore_client_t* client)
 {
 	int tss_enabled = 0;
@@ -1750,11 +1790,20 @@ void plain_progress_cb(int step, double step_progress, void* userdata)
 
 static void plain_progress_func(struct progress_info_entry** progress_info, int count)
 {
+	static double last_progress = -1.0;  // Initialize to -1 so first print always works
+	
 	int i = 0;
 	for (i = 0; i < count; i++) {
 		if (!progress_info[i]) continue;
+		
+		// Only print if progress increased by at least 0.1 (10%)
+		if (progress_info[i]->progress < last_progress + 0.1) {
+			continue;  // Skip - not enough change
+		}
+		
 		printf("%s: %5.1f\n", progress_info[i]->label, progress_info[i]->progress);
 		fflush(stdout);
+		last_progress = progress_info[i]->progress;
 	}
 }
 
@@ -1825,7 +1874,7 @@ int main(int argc, char* argv[])
 #define P_FLAG ""
 #endif
 
-	while ((opt = getopt_long(argc, argv, "dhces:xtli:u:nC:kyPRT:zv" P_FLAG, longopts, &optindex)) > 0) {
+	while ((opt = getopt_long(argc, argv, "dhcers:xtli:u:nC:kyPRT:zv" P_FLAG, longopts, &optindex)) > 0) {
 		switch (opt) {
 		case 'h':
 			usage(argc, argv, 0);
@@ -1840,13 +1889,16 @@ int main(int argc, char* argv[])
 			break;
 
 		case 'e':
-			client->flags |= FLAG_ERASE;
+			client->flags |= FLAG_ERASE;	
 			break;
 
 		case 'c':
 			client->flags |= FLAG_CUSTOM;
 			break;
 
+		case 'r':
+			client->flags |= FLAG_FORCE_RECOVERY;
+			break;
 		case 's': {
 			if (!*optarg) {
 				logger(LL_ERROR, "URL argument for --server must not be empty!\n");
@@ -2045,6 +2097,24 @@ int main(int argc, char* argv[])
 	}
 
 	curl_global_init(CURL_GLOBAL_ALL);
+
+
+
+		// Handle force recovery mode if requested
+		if (true || (client->flags & FLAG_FORCE_RECOVERY)) {
+			int ret = assertRecoveryMode(client);
+			if(ret==0){
+				logger(LL_INFO, "Device was already in recovery mode\n");
+			}
+			else if(ret==1){
+				logger(LL_INFO, "Device was not in recovery mode, but force recovery mode was requested\n");
+			}
+			else{
+				logger(LL_INFO, "Device is not in recovery mode\n");
+				
+			}
+		
+		}
 
 	client->flags |= FLAG_IN_PROGRESS;
 	result = idevicerestore_start(client);
