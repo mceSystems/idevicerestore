@@ -1500,6 +1500,11 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		recovery_client_free(client);
 		logger(LL_DEBUG, "Waiting for device to reconnect in recovery mode...\n");
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 60000);
+		tries = 3 ;
+		while(tries-- && (client->mode != MODE_RECOVERY || (client->flags & FLAG_QUIT))) {
+			logger(LL_DEBUG, "cond_wait_timeout retry\n");
+			cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 3000);
+		}
 		if (client->mode != MODE_RECOVERY || (client->flags & FLAG_QUIT)) {
 			mutex_unlock(&client->device_event_mutex);
 			if (!(client->flags & FLAG_QUIT)) {
