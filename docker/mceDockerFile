@@ -15,12 +15,31 @@ RUN C:\msys64\usr\bin\bash.exe -lc "pacman --noconfirm -Scc"
 RUN C:\msys64\usr\bin\bash.exe -lc "pacman -Syu --noconfirm"
 RUN C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm git"
 RUN C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm make automake autoconf libtool pkg-config gcc curl python3"
-RUN C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm mingw-w64-x86_64-gcc mingw-w64-x86_64-pkg-config mingw-w64-x86_64-libzip mingw-w64-x86_64-openssl mingw-w64-x86_64-curl"
+# Install MSYS2 packages - Check available versions first, then install
+RUN C:\msys64\usr\bin\bash.exe -lc "echo '=== Checking available package versions ===' && pacman -Ss mingw-w64-x86_64-curl | head -5 && pacman -Ss mingw-w64-x86_64-openssl | head -5 && pacman -Ss mingw-w64-x86_64-zlib | head -5"
+
+# Install MSYS2 packages - Using latest available (will match remote PC's curl 8.7.1 if available)
+RUN C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm \
+    mingw-w64-x86_64-gcc \
+    mingw-w64-x86_64-pkg-config \
+    mingw-w64-x86_64-libzip \
+    mingw-w64-x86_64-openssl \
+    mingw-w64-x86_64-curl \
+    mingw-w64-x86_64-zlib \
+    mingw-w64-x86_64-libidn2 \
+    mingw-w64-x86_64-libpsl \
+    mingw-w64-x86_64-libssh2 \
+    mingw-w64-x86_64-nghttp2 \
+    mingw-w64-x86_64-brotli \
+    mingw-w64-x86_64-zstd \
+    mingw-w64-x86_64-bzip2 \
+    mingw-w64-x86_64-xz && \
+    echo '=== Installed versions ===' && pacman -Q | grep -E '(curl|openssl|zlib|libzip|bzip2|xz)'"
 RUN setx MSYSTEM "MINGW64"
 RUN setx MSYS2_PATH_TYPE "inherit"
 
 RUN mkdir C:\libimobiledevice
-WORKDIR C:\\libimobiledevice
+WORKDIR C:/libimobiledevice
 
 RUN C:\msys64\usr\bin\bash.exe -lc "gcc --version"
 
@@ -33,34 +52,170 @@ RUN C:\msys64\usr\bin\bash.exe -lc " \
     git clone https://github.com/libimobiledevice/libimobiledevice.git && \
     git clone https://github.com/libimobiledevice/idevicerestore.git"
 
-WORKDIR C:\\libimobiledevice\\libplist
+
+    
+RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice && git clone -b activation-error-build https://github.com/mceSystems/idevicerestore.git mceIdevicerestore"
+
+WORKDIR C:/libimobiledevice/libplist
 RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/libplist && ./autogen.sh --enable-static --disable-shared && make && make install"
 
 RUN C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm mingw-w64-x86_64-libusb"
 RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice && git clone https://github.com/libimobiledevice/libirecovery.git"
 
-WORKDIR C:\\libimobiledevice\\libimobiledevice-glue
-RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/libimobiledevice-glue && ./autogen.sh --enable-static --disable-shared CFLAGS='-DLIBPLIST_STATIC' && make && make install"
+WORKDIR C:/libimobiledevice/libimobiledevice-glue
+RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/libimobiledevice-glue && export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:/usr/local/lib/pkgconfig && export PKG_CONFIG='/mingw64/bin/pkg-config --static' && ./autogen.sh --enable-static --disable-shared CFLAGS='-DLIBPLIST_STATIC' && make && make install"
 
-WORKDIR C:\\libimobiledevice\\libtatsu
-RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/libtatsu && ./autogen.sh --enable-static --disable-shared CFLAGS='-DLIBPLIST_STATIC -DCURL_STATICLIB' && make && make install"
+WORKDIR C:/libimobiledevice/libtatsu
+RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/libtatsu && export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:/usr/local/lib/pkgconfig && export PKG_CONFIG='/mingw64/bin/pkg-config --static' && ./autogen.sh --enable-static --disable-shared CFLAGS='-DLIBPLIST_STATIC -DCURL_STATICLIB' && make && make install"
 
-WORKDIR C:\\libimobiledevice\\libusbmuxd
-RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/libusbmuxd && ./autogen.sh --enable-static --disable-shared CFLAGS='-DLIMD_GLUE_STATIC -DLIBPLIST_STATIC' && make -C src && make -C include && make -C src install && make -C include install"
+WORKDIR C:/libimobiledevice/libusbmuxd
+RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/libusbmuxd && export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:/usr/local/lib/pkgconfig && export PKG_CONFIG='/mingw64/bin/pkg-config --static' && ./autogen.sh --enable-static --disable-shared CFLAGS='-DLIMD_GLUE_STATIC -DLIBPLIST_STATIC' && make -C src && make -C include && make -C src install && make -C include install"
 
-WORKDIR C:\\libimobiledevice\\libimobiledevice
-RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/libimobiledevice && ./autogen.sh --enable-static --disable-shared CFLAGS='-DLIMD_GLUE_STATIC -DLIBUSBMUXD_STATIC -DLIBPLIST_STATIC' && make -C 3rd_party && make -C common && make -C src && make -C include && make -C src install && make -C include install"
+WORKDIR C:/libimobiledevice/libimobiledevice
+RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/libimobiledevice && export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:/usr/local/lib/pkgconfig && export PKG_CONFIG='/mingw64/bin/pkg-config --static' && ./autogen.sh --enable-static --disable-shared CFLAGS='-DLIMD_GLUE_STATIC -DLIBUSBMUXD_STATIC -DLIBPLIST_STATIC' && make -C 3rd_party && make -C common && make -C src && make -C include && make -C src install && make -C include install"
 
-WORKDIR C:\\libimobiledevice
-COPY docker/libirecovery-1.0.dll C:\\msys64\\mingw64\\bin\\libirecovery-1.0.dll
-COPY docker/libirecovery-1.0.dll.a C:\\msys64\\mingw64\\lib\\libirecovery-1.0.dll.a
-COPY docker/libirecovery.h C:\\msys64\\mingw64\\include\\libirecovery.h
-COPY docker/libirecovery-1.0.pc C:\\msys64\\mingw64\\lib\\pkgconfig\\libirecovery-1.0.pc
+WORKDIR C:/libimobiledevice
+# Copy libirecovery files from cloned mceIdevicerestore repo
+# Dependencies are managed in git under deps/ directory in mceIdevicerestore repo
+RUN C:\msys64\usr\bin\bash.exe -lc "cp /c/libimobiledevice/mceIdevicerestore/deps/libirecovery-1.0.dll /mingw64/bin/libirecovery-1.0.dll && \
+    cp /c/libimobiledevice/mceIdevicerestore/deps/libirecovery-1.0.dll.a /mingw64/lib/libirecovery-1.0.dll.a && \
+    cp /c/libimobiledevice/mceIdevicerestore/deps/libirecovery.h /mingw64/include/libirecovery.h && \
+    cp /c/libimobiledevice/mceIdevicerestore/deps/libirecovery-1.0.pc /mingw64/lib/pkgconfig/libirecovery-1.0.pc && \
+    echo 'Copied libirecovery dependencies from mceIdevicerestore/deps/'"
 
-RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice && git clone -b activation-error-build https://github.com/mceSystems/idevicerestore.git mceIdevicerestore"
+# Copy remote PC's libcurl.a and libcurl.pc from cloned mceIdevicerestore repo
+# Verified: libcurl.pc has NO ngtcp2/nghttp3 dependencies
+# Dependencies are managed in git under deps/ directory in mceIdevicerestore repo
+RUN C:\msys64\usr\bin\bash.exe -lc "cp /c/libimobiledevice/mceIdevicerestore/deps/libcurl.a /mingw64/lib/libcurl.a && \
+    cp /c/libimobiledevice/mceIdevicerestore/deps/libcurl.pc /mingw64/lib/pkgconfig/libcurl.pc && \
+    mkdir -p /mingw64/include/curl && \
+    cp -r /c/libimobiledevice/mceIdevicerestore/deps/curl-headers/* /mingw64/include/curl/ && \
+    echo 'Copied libcurl dependencies from mceIdevicerestore/deps/'"
 
-WORKDIR C:\\libimobiledevice\\mceIdevicerestore
-RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/mceIdevicerestore && export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:/usr/local/lib/pkgconfig && ./autogen.sh --enable-static --disable-shared CFLAGS='-DLIMD_GLUE_STATIC -DLIBUSBMUXD_STATIC -DLIBIMOBILEDEVICE_STATIC -DLIBPLIST_STATIC -DLIBTATSU_STATIC -DCURL_STATICLIB' LDFLAGS='-static-libgcc' && make && make install"
 
-RUN C:\msys64\usr\bin\bash.exe -lc "cp /c/libimobiledevice/mceIdevicerestore/src/idevicerestore.exe /c/idevicerestore.exe && ls -lh /c/idevicerestore.exe"
+# Build static libzip to avoid libzip.dll import
+RUN C:\msys64\usr\bin\bash.exe -lc "set -e && \
+    pacman -S --noconfirm cmake ninja make gcc && \
+    export PATH=/mingw64/bin:$PATH && \
+    cd /c && \
+    curl -L -o libzip.tar.gz https://libzip.org/download/libzip-1.10.1.tar.gz && \
+    tar xf libzip.tar.gz && cd libzip-1.10.1 && \
+    mkdir -p build && cd build && \
+cmake -G Ninja \
+      -DCMAKE_C_COMPILER=/mingw64/bin/gcc \
+      -DCMAKE_AR=/mingw64/bin/ar -DCMAKE_RANLIB=/mingw64/bin/ranlib \
+      -DBUILD_SHARED_LIBS=OFF \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DZLIB_LIBRARY=/mingw64/lib/libz.a \
+      -DZLIB_INCLUDE_DIR=/mingw64/include \
+      -DENABLE_BZIP2=OFF -DENABLE_LZMA=OFF -DENABLE_ZSTD=OFF \
+      -DENABLE_GNUTLS=OFF -DENABLE_MBEDTLS=OFF -DENABLE_OPENSSL=OFF -DENABLE_WINDOWS_CRYPTO=OFF \
+      -DBUILD_TOOLS=OFF -DBUILD_DOC=OFF -DBUILD_REGRESS=OFF -DBUILD_EXAMPLES=OFF \
+      .. && \
+    ninja -j$(nproc) && ninja install"
+
+# Use MSYS2's pre-built static curl libraries (already installed via pacman on line 23)
+# No need to build from source - MSYS2 provides static .a files
+RUN C:\msys64\usr\bin\bash.exe -lc "echo 'Checking curl static libs:' && ls -la /mingw64/lib/libcurl.a && pkg-config --static --libs libcurl && echo 'Checking ngtcp2 libs:' && ls -la /mingw64/lib/libngtcp2* 2>/dev/null || echo 'No ngtcp2 libs found'"
+
+WORKDIR C:/libimobiledevice/mceIdevicerestore
+
+# Force rebuild of idevicerestore (change this comment to invalidate cache)
+RUN echo "Building idevicerestore"
+
+# Build mceidevicerestore (your fork) with static linking
+# Step 1: Setup environment and run autogen.sh
+RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/mceIdevicerestore && \
+    export MSYSTEM=MINGW64 && \
+    export PATH=/mingw64/bin:$PATH && \
+    export CC=/mingw64/bin/gcc && \
+    export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:/usr/local/lib/pkgconfig && \
+    export PKG_CONFIG='/mingw64/bin/pkg-config --static' && \
+    ./autogen.sh"
+
+# Step 2: Configure
+# Remove DLL import libraries to force static linking
+RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/mceIdevicerestore && \
+    echo 'Removing DLL import libraries to force static linking...' && \
+    rm -f /mingw64/lib/libz.dll.a /mingw64/lib/libssl.dll.a /mingw64/lib/libcrypto.dll.a \
+          /mingw64/lib/libcurl.dll.a /mingw64/lib/libzip.dll.a /mingw64/lib/libbz2.dll.a \
+          /mingw64/lib/liblzma.dll.a /mingw64/lib/libnghttp2.dll.a /mingw64/lib/libidn2.dll.a \
+          /mingw64/lib/libssh2.dll.a /mingw64/lib/libpsl.dll.a /mingw64/lib/libzstd.dll.a \
+          /mingw64/lib/libbrotlidec.dll.a /mingw64/lib/libbrotlicommon.dll.a \
+          /mingw64/lib/libiconv.dll.a /mingw64/lib/libunistring.dll.a /mingw64/lib/libintl.dll.a \
+          /mingw64/lib/libnghttp3.dll.a /mingw64/lib/libngtcp2.dll.a /mingw64/lib/libngtcp2_crypto_ossl.dll.a && \
+    rm -f /mingw64/bin/libnghttp3*.dll /mingw64/bin/libngtcp2*.dll 2>/dev/null || true && \
+    echo 'DLL imports removed. Remaining static libs:' && ls -la /mingw64/lib/libz.a /mingw64/lib/libcurl.a /mingw64/lib/libzip.a 2>/dev/null || echo 'Some libs not found'"
+
+RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/mceIdevicerestore && \
+    export MSYSTEM=MINGW64 && \
+    export PATH=/mingw64/bin:$PATH && \
+    export CC=/mingw64/bin/gcc && \
+    export PKG_CONFIG_PATH=/mingw64/lib/pkgconfig:/usr/local/lib/pkgconfig && \
+    export PKG_CONFIG='/mingw64/bin/pkg-config --static' && \
+    ./configure \
+        --enable-static --disable-shared \
+        libplist_CFLAGS=-DLIBPLIST_STATIC \
+        limd_glue_CFLAGS=-DLIMD_GLUE_STATIC \
+        libtatsu_CFLAGS=-DLIBTATSU_STATIC \
+        libusbmuxd_CFLAGS=-DLIBUSBMUXD_STATIC \
+        libimobiledevice_CFLAGS=-DLIBIMOBILEDEVICE_STATIC \
+        libcurl_CFLAGS=-DCURL_STATICLIB \
+        libzip_CFLAGS=-DZIP_STATIC \
+        libcurl_LIBS='/mingw64/lib/libcurl.a' \
+        zlib_LIBS='/mingw64/lib/libz.a' \
+        libzip_LIBS='/mingw64/lib/libzip.a' && \
+    echo '=== Checking what Makefile will use ===' && grep 'libcurl_LIBS' src/Makefile && grep 'zlib_LIBS' src/Makefile && grep 'libzip_LIBS' src/Makefile && \
+    echo 'Install prefix:' && grep '^prefix=' Makefile | head -1"
+
+# Step 3: Build
+RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/mceIdevicerestore && \
+    export MSYSTEM=MINGW64 && \
+    export PATH=/mingw64/bin:$PATH && \
+    export CC=/mingw64/bin/gcc && \
+    echo '=== Checking Makefile libzip_LIBS ===' && grep 'libzip_LIBS' src/Makefile || echo 'libzip_LIBS not found in Makefile' && \
+    make LDFLAGS='-static -static-libgcc' LIBS='-lpsl -lssl -lcrypto -lws2_32 -lssh2 -lcrypt32 -lGdi32 -lBcrypt -lnghttp2 -lncrypt -lzstd -lbrotlidec -lz -lidn2 -lwldap32 -lbrotlicommon -lunistring -liconv -lintl -lbz2 -llzma -lsecur32' && \
+    echo 'Checking for binary after make:' && find . -name 'idevicerestore.exe' -type f"
+
+# Step 4: Install
+RUN C:\msys64\usr\bin\bash.exe -lc "cd /c/libimobiledevice/mceIdevicerestore && \
+    export MSYSTEM=MINGW64 && \
+    export PATH=/mingw64/bin:$PATH && \
+    make install && \
+    echo 'Checking install location:' && find /usr/local -name 'idevicerestore.exe' -type f 2>/dev/null || echo 'Not found in /usr/local'"
+
+# Step 5: Check where the exe is located and verify import table
+#RUN dir "C:\libimobiledevice\mceIdevicerestore\src\idevicerestore.exe"
+#RUN dir "C:\msys64\usr\local\bin" 2>nul || echo "Directory check"
+#RUN if exist "C:\msys64\usr\local\bin\idevicerestore.exe" (dir "C:\msys64\usr\local\bin\idevicerestore.exe") else (echo idevicerestore.exe not found in C:\msys64\usr\local\bin)
+
+# Check import table using objdump (if available) or dumpbin
+#RUN C:\msys64\usr\bin\bash.exe -lc "echo '=== Checking import table ===' && if [ -f /c/libimobiledevice/mceIdevicerestore/src/idevicerestore.exe ]; then /mingw64/bin/objdump -p /c/libimobiledevice/mceIdevicerestore/src/idevicerestore.exe | grep -A 100 'DLL Name' || echo 'objdump failed'; elif [ -f /usr/local/bin/idevicerestore.exe ]; then /mingw64/bin/objdump -p /usr/local/bin/idevicerestore.exe | grep -A 100 'DLL Name' || echo 'objdump failed'; else echo 'Binary not found'; fi"
+
+#RUN dir "C:\libimobiledevice\mceIdevicerestore\*"
+
+
+# RUN C:\msys64\mingw64.exe -lc "set -e && \
+#    cd /c/libimobiledevice/mceIdevicerestore && \
+#    rm -f config.cache && git clean -xfd || true && \
+#    export PKG_CONFIG_STATIC=1 && \
+#    export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/mingw64/lib/pkgconfig && \
+#    echo 'Checking libcurl pkg-config:' && \
+#    pkg-config --modversion libcurl && pkg-config --static --libs libcurl && \
+#    ./autogen.sh --enable-static --disable-shared \
+#        CFLAGS='-DLIMD_GLUE_STATIC -DLIBUSBMUXD_STATIC -DLIBIMOBILEDEVICE_STATIC -DLIBPLIST_STATIC -DLIBTATSU_STATIC -DCURL_STATICLIB' \
+#        LDFLAGS='-static -static-libgcc' \
+#        libcurl_CFLAGS='-DCURL_STATICLIB' \
+#        libcurl_LIBS='/usr/local/lib/libcurl.a /mingw64/lib/libssl.a /mingw64/lib/libcrypto.a /mingw64/lib/libz.a -lws2_32 -lcrypt32 -lwldap32'"
+
+
+#RUN C:\msys64\mingw64.exe -lc " cd /c/libimobiledevice/mceIdevicerestore && \
+#    export PKG_CONFIG_STATIC=1 && \
+#    export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/mingw64/lib/pkgconfig && \
+#    make -j$(nproc) V=1"
+
+
+
+
+
 
